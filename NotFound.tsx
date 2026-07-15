@@ -1,28 +1,7 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
-type Role = 'Admin' | 'Client' | 'Vendor' | 'Qualifier';
+// Read from localStorage first (for the Settings UI), fallback to env vars, fallback to dummy
+const supabaseUrl = localStorage.getItem('supabaseUrl') || import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = localStorage.getItem('supabaseAnonKey') || import.meta.env.VITE_SUPABASE_ANON_KEY || 'dummy_key';
 
-interface RoleContextType {
-  role: Role;
-  setRole: (role: Role) => void;
-}
-
-const RoleContext = createContext<RoleContextType | undefined>(undefined);
-
-export const RoleProvider = ({ children }: { children: ReactNode }) => {
-  const [role, setRole] = useState<Role>('Admin');
-
-  return (
-    <RoleContext.Provider value={{ role, setRole }}>
-      {children}
-    </RoleContext.Provider>
-  );
-};
-
-export const useRole = () => {
-  const context = useContext(RoleContext);
-  if (context === undefined) {
-    throw new Error('useRole must be used within a RoleProvider');
-  }
-  return context;
-};
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
