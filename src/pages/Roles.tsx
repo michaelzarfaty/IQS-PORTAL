@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UsersRound, Shield, Edit, Plus, Check, Mail } from "lucide-react";
+import { UsersRound, Shield, Edit, Plus, Check, Mail, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 const Roles = () => {
-  const [users, setUsers] = useState([
+  const [users, setUsers] = useState<any[]>([
     { id: 1, name: "Alice Admin", email: "alice@iqs.com", role: "Super Admin", status: "Active" },
     { id: 2, name: "Bob Manager", email: "bob@iqs.com", role: "Compliance Manager", status: "Active" },
     { id: 3, name: "Charlie Vendor", email: "charlie@vendor.com", role: "Vendor", status: "Pending" },
@@ -19,16 +20,101 @@ const Roles = () => {
 
   const [newUser, setNewUser] = useState({ name: "", email: "", role: "Compliance Manager" });
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleInviteUser = () => {
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*');
+        if (data && !error && data.length > 0) {
+          const formattedUsers = data.map((p: any) => ({
+            id: p.id,
+            name: p.full_name || p.name || 'Unknown',
+            email: p.email,
+            role: p.role || 'User',
+            status: p.status || 'Active'
+          }));
+          setUsers(prev => {
+            const existingEmails = new Set(prev.map(u => u.email));
+            const newUsers = formattedUsers.filter(u => !existingEmails.has(u.email));
+            return [...prev, ...newUsers];
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching users:", err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const handleInviteUser = async () => {
     if (!newUser.name || !newUser.email) {
       toast.error("Please fill out all fields.");
       return;
     }
-    setUsers([...users, { id: users.length + 1, ...newUser, status: "Pending" }]);
-    setInviteOpen(false);
-    toast.success("User invited successfully!");
-    setNewUser({ name: "", email: "", role: "Compliance Manager" });
+
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.from('profiles').insert([
+        { 
+          full_name: newUser.name, 
+          email: newUser.email, 
+          role: newUser.role,
+          status: 'Pending'
+        }
+      ]);
+
+      if (error) {
+        console.error("Supabase error:", error);
+        toast.error("Database error: Please make sure you have created a 'profiles' table in Supabase.", {
+          duration: 5000
+        });
+      } else {
+        toast.success(`Invitation email sent to ${newUser.email}!`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to connect to database.");
+    } finally {
+      setIsLoading(false);
+      setUsers(prev => [...prev, { id: prev.length + 1, ...newUser, status: "Pending" }]);
+      setInviteOpen(false);
+      setNewUser({ name: "", email: "", role: "Compliance Manager" });
+    }
+  };
+
+  const handleDeleteUser = async (id: number, email: string) => {
+    try {
+      await supabase.from('profiles').delete().eq('email', email);
+    } catch (err) {
+      console.error(err);
+    }
+    setUsers(users.filter(u => u.id !== id));
+    toast.success("User deleted successfully!");
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    setIsLoading(true);
+    try {
+      if (typeof editingUser.id === 'string' || editingUser.id > 3) {
+        await supabase.from('profiles').update({
+          full_name: editingUser.name,
+          role: editingUser.role,
+          status: editingUser.status
+        }).eq('id', editingUser.id);
+      }
+      setUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
+      toast.success("User updated successfully!");
+      setEditingUser(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update user.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const permissionModules = [
@@ -77,6 +163,8 @@ const Roles = () => {
                     <SelectContent>
                       <SelectItem value="Super Admin">Super Admin</SelectItem>
                       <SelectItem value="Compliance Manager">Compliance Manager</SelectItem>
+                      <SelectItem value="Sales">Sales</SelectItem>
+                      <SelectItem value="Employee">Employee</SelectItem>
                       <SelectItem value="Vendor">Vendor</SelectItem>
                       <SelectItem value="Client">Client</SelectItem>
                     </SelectContent>
@@ -84,8 +172,10 @@ const Roles = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
-                <Button onClick={handleInviteUser}>Send Invite</Button>
+                <Button variant="outline" onClick={() => setInviteOpen(false)} disabled={isLoading}>Cancel</Button>
+                <Button onClick={handleInviteUser} disabled={isLoading}>
+                  {isLoading ? "Sending..." : "Send Invite"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -222,9 +312,12 @@ const Roles = () => {
                       {user.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">
+                  <TableCell className="text-right whitespace-nowrap">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingUser(user)}>
                       <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(user.id, user.email)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -232,6 +325,63 @@ const Roles = () => {
             </TableBody>
           </Table>
         </div>
+
+        {/* Edit User Dialog */}
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>Update user role and details.</DialogDescription>
+            </DialogHeader>
+            {editingUser && (
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input value={editingUser.name} onChange={(e) => setEditingUser({...editingUser, name: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <Input type="email" value={editingUser.email} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={editingUser.role} onValueChange={(v) => setEditingUser({...editingUser, role: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Super Admin">Super Admin</SelectItem>
+                      <SelectItem value="Compliance Manager">Compliance Manager</SelectItem>
+                      <SelectItem value="Sales">Sales</SelectItem>
+                      <SelectItem value="Employee">Employee</SelectItem>
+                      <SelectItem value="Vendor">Vendor</SelectItem>
+                      <SelectItem value="Client">Client</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={editingUser.status} onValueChange={(v) => setEditingUser({...editingUser, status: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingUser(null)} disabled={isLoading}>Cancel</Button>
+              <Button onClick={handleUpdateUser} disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
