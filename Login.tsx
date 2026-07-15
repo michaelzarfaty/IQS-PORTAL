@@ -93,33 +93,42 @@ export default function Login() {
 
                 {['client', 'qualifier', 'vendor', 'admin'].map((tab) => (
                   <TabsContent key={tab} value={tab} className="space-y-4 mt-0">
-                    <div className="space-y-2">
-                      <Label htmlFor={`${tab}-email`}>Email</Label>
-                      <Input 
-                        id={`${tab}-email`} 
-                        type="email" 
-                        placeholder="name@example.com" 
-                        className="bg-slate-900/50 border-slate-800"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor={`${tab}-password`}>Password</Label>
-                        <button type="button" onClick={() => setView('forgot_password')} className="text-xs text-primary hover:underline">Forgot password?</button>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      handleLogin(tab.charAt(0).toUpperCase() + tab.slice(1) as any);
+                    }}>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`${tab}-email`}>Email</Label>
+                          <Input 
+                            id={`${tab}-email`} 
+                            type="email" 
+                            placeholder="name@example.com" 
+                            className="bg-slate-900/50 border-slate-800"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor={`${tab}-password`}>Password</Label>
+                            <button type="button" onClick={() => setView('forgot_password')} className="text-xs text-primary hover:underline">Forgot password?</button>
+                          </div>
+                          <Input 
+                            id={`${tab}-password`} 
+                            type="password" 
+                            className="bg-slate-900/50 border-slate-800"
+                            required
+                          />
+                        </div>
+                        <Button 
+                          type="submit"
+                          className="w-full mt-6" 
+                          disabled={isLoading}
+                        >
+                          {isLoading ? "Signing in..." : "Sign in"}
+                        </Button>
                       </div>
-                      <Input 
-                        id={`${tab}-password`} 
-                        type="password" 
-                        className="bg-slate-900/50 border-slate-800"
-                      />
-                    </div>
-                    <Button 
-                      className="w-full mt-6" 
-                      onClick={() => handleLogin(tab.charAt(0).toUpperCase() + tab.slice(1) as any)}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Signing in..." : "Sign in"}
-                    </Button>
+                    </form>
                     <div className="mt-4 text-center">
                       <button 
                         type="button" 
