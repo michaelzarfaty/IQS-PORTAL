@@ -68,8 +68,8 @@ const Roles = () => {
 
       if (error) {
         console.error("Supabase error:", error);
-        toast.error("Database error: Please make sure you have created a 'profiles' table in Supabase.", {
-          duration: 5000
+        toast.error(`Database error: ${error.message || error.details || "Unknown error"}`, {
+          duration: 8000
         });
       } else {
         toast.success(`Invitation email sent to ${newUser.email}!`);
