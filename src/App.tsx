@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,7 +11,6 @@ import Roles from "./pages/Roles";
 import Onboarding from "./pages/Onboarding";
 import Retention from "./pages/Retention";
 import Login from "./pages/Login";
-import Export from "./pages/Export";
 import Settings from "./pages/Settings";
 import { RoleProvider } from "./lib/RoleContext";
 
@@ -30,7 +30,6 @@ const App = () => (
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/retention" element={<Retention />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/export" element={<Export />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
