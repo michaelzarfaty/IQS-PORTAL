@@ -1,26 +1,25 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "@leadconnector/vibe-tagger";
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IQS - Qualifier Network</title>
+    <meta name="description" content="Manage contractor licenses, renewals, and availability." />
+    <meta name="author" content="IQS" />
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    allowedHosts: [".modal.host"],
-    watch: { aggregateTimeout: 2000 },
-    hmr: { timeout: 30000,
-      overlay: false,
-    },
-  },
-  plugins: [
-    react(),
-    mode === "development" && componentTagger({ tailwindConfig: true }),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-}));
+    <meta property="og:title" content="IQS - Qualifier Network" />
+    <meta property="og:description" content="Manage contractor licenses, renewals, and availability." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@IQS" />
+    <meta name="twitter:image" content="" />
+  </head>
+
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,43 +1,42 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Reports from "./pages/Reports";
-import Roles from "./pages/Roles";
-import Onboarding from "./pages/Onboarding";
-import Retention from "./pages/Retention";
-import Login from "./pages/Login";
-import Export from "./pages/Export";
-import Settings from "./pages/Settings";
-import { RoleProvider } from "./lib/RoleContext";
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
 
-const queryClient = new QueryClient();
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <RoleProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-      <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/roles" element={<Roles />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/retention" element={<Retention />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/export" element={<Export />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-      </BrowserRouter>
-      </TooltipProvider>
-    </RoleProvider>
-  </QueryClientProvider>
-);
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-export default App;
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
