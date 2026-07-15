@@ -254,6 +254,7 @@ const Index = () => {
   ]);
   const unreadCount = notifications.filter(n => !n.read).length;
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
   const [isCheckingBackground, setIsCheckingBackground] = useState(false);
   const [backgroundCheckStatus, setBackgroundCheckStatus] = useState("Valid until Dec 2026");
@@ -646,6 +647,22 @@ const handleGenerateTaxReport = () => {
     form.reset();
   };
 
+  const handleDeleteContractor = (id: number) => {
+    if (confirm("Are you sure you want to delete this qualifier?")) {
+      setContractorsList(prev => prev.filter(c => c.id !== id));
+      setSelectedContractor(null);
+      toast.success("Qualifier deleted successfully");
+    }
+  };
+
+  const handleBlacklistContractor = (id: number) => {
+    if (confirm("Are you sure you want to blacklist this qualifier?")) {
+      setContractorsList(prev => prev.map(c => c.id === id ? { ...c, status: "Blacklisted" } : c));
+      setSelectedContractor(null);
+      toast.success("Qualifier blacklisted successfully");
+    }
+  };
+
   const handleEditClick = (contractor: any) => {
     setEditingId(contractor.id);
     form.reset({
@@ -662,6 +679,8 @@ const handleGenerateTaxReport = () => {
     setSelectedContractor(null);
     setIsFormModalOpen(true);
   };
+
+
 
   const handleAddClick = () => {
     setEditingId(null);
@@ -994,53 +1013,231 @@ const handleGenerateTaxReport = () => {
             </div>
           </div>
         </div>
-      ) : role === 'Vendor' ? (
+      ) : role === 'Vendor' && viewMode !== 'map' ? (
         <div className="p-8 max-w-[1400px] mx-auto space-y-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">Vendor Portal</h1>
-              <p className="text-muted-foreground">Manage your placements and request documents.</p>
+              <p className="text-muted-foreground">Manage your placements, licenses, and renewals.</p>
             </div>
-            <Button onClick={() => setIsAddDocModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Request Document
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsAddDocModalOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" /> Upload License
+              </Button>
+              <Button onClick={() => setIsAddDocModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Request Document
+              </Button>
+            </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm border border-border/50 overflow-hidden">
-            <div className="p-6 border-b border-border/50">
-              <h3 className="text-lg font-semibold">Active Placements</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="bg-white rounded-xl shadow-sm border border-border/50 overflow-hidden">
+                <div className="p-6 border-b border-border/50 flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">My Active Licenses</h3>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">3 Active</Badge>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>State</TableHead>
+                      <TableHead>Classification</TableHead>
+                      <TableHead>License #</TableHead>
+                      <TableHead>Renewal Date</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">FL</div>
+                          Florida
+                        </div>
+                      </TableCell>
+                      <TableCell>Electrical Contractor</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">EC13008455</TableCell>
+                      <TableCell>Aug 31, 2026</TableCell>
+                      <TableCell><Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Active</Badge></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 text-xs font-bold">TX</div>
+                          Texas
+                        </div>
+                      </TableCell>
+                      <TableCell>Master Electrician</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">ME44219</TableCell>
+                      <TableCell>Dec 15, 2026</TableCell>
+                      <TableCell><Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Active</Badge></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-rose-100 flex items-center justify-center text-rose-700 text-xs font-bold">CA</div>
+                          California
+                        </div>
+                      </TableCell>
+                      <TableCell>C-10 Electrical</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">C10-998211</TableCell>
+                      <TableCell className="text-rose-600 font-medium flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Oct 15, 2025</TableCell>
+                      <TableCell><Badge className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-none">Expiring Soon</Badge></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-border/50 overflow-hidden">
+                <div className="p-6 border-b border-border/50">
+                  <h3 className="text-lg font-semibold">Active Placements</h3>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Placement</TableHead>
+                      <TableHead>Qualifier</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Pending Docs</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Lightning Electric</TableCell>
+                      <TableCell>James Ortega</TableCell>
+                      <TableCell><Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">Processing</Badge></TableCell>
+                      <TableCell><span className="text-amber-600 font-medium">1 pending</span></TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm">View Details</Button>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Volt Masters</TableCell>
+                      <TableCell>Angela Torres</TableCell>
+                      <TableCell><Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none">Onboarding</Badge></TableCell>
+                      <TableCell><span className="text-red-600 font-medium">3 blocking</span></TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm">View Details</Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Placement</TableHead>
-                  <TableHead>Qualifier</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Pending Docs</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Lightning Electric</TableCell>
-                  <TableCell>James Ortega</TableCell>
-                  <TableCell><Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">Processing</Badge></TableCell>
-                  <TableCell><span className="text-amber-600 font-medium">1 pending</span></TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">View Details</Button>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Volt Masters</TableCell>
-                  <TableCell>Angela Torres</TableCell>
-                  <TableCell><Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none">Onboarding</Badge></TableCell>
-                  <TableCell><span className="text-red-600 font-medium">3 blocking</span></TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">View Details</Button>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+
+            <div className="space-y-8">
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4 text-primary" />
+                    Upcoming Deadlines
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-3 p-3 rounded-md bg-rose-50 border border-rose-100">
+                    <div className="mt-0.5">
+                      <AlertCircle className="w-4 h-4 text-rose-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-rose-900">CA License Renewal</p>
+                      <p className="text-xs text-rose-700 mt-1">Due in 30 days. CE credits required.</p>
+                      <Button size="sm" variant="outline" className="mt-3 bg-white text-rose-700 border-rose-200 hover:bg-rose-50 w-full h-8 text-xs">Start Renewal</Button>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 p-3 rounded-md border border-border/50">
+                    <div className="mt-0.5">
+                      <ShieldAlert className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">General Liability Insurance</p>
+                      <p className="text-xs text-muted-foreground mt-1">Expires Dec 31, 2026</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileSignature className="w-4 h-4 text-primary" />
+                    Pending Signatures
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md transition-colors cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Liability Waiver</p>
+                        <p className="text-xs text-muted-foreground">Lightning Electric</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">Sign</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          
+          <div className="relative bg-white rounded-xl shadow-sm border border-border/50 p-8 overflow-hidden min-h-[500px] flex items-center justify-center mt-8">
+             {/* Blurred Map Background */}
+             <div className="absolute inset-0 filter blur-md opacity-50 pointer-events-none select-none overflow-hidden flex items-center justify-center">
+                <div className="w-full h-full bg-slate-100 dark:bg-slate-900 grid grid-cols-12 gap-4 p-8">
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <div key={i} className="bg-slate-300 dark:bg-slate-700 rounded-md h-16 opacity-20"></div>
+                  ))}
+                </div>
+             </div>
+             
+             {/* Paywall Overlay */}
+             <div className="relative z-10 flex flex-col items-center justify-center text-center py-10 px-4">
+                <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6">
+                   <Lock className="w-8 h-8" />
+                </div>
+                <h3 className="text-3xl font-bold mb-4">Unlock the Reciprocity Map</h3>
+                <p className="text-lg text-muted-foreground max-w-lg mb-8">
+                  Discover licensing reciprocity across all 50 states, analyze contractor density, and identify high-potential expansion markets.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl w-full text-left">
+                   <Card className="border-border/50 bg-white dark:bg-slate-950 shadow-sm">
+                      <CardHeader>
+                         <CardTitle>Monthly Pass</CardTitle>
+                         <div className="text-3xl font-bold mt-2">$49<span className="text-sm text-muted-foreground font-normal">/mo</span></div>
+                      </CardHeader>
+                      <CardContent>
+                         <ul className="text-sm space-y-3 mb-6">
+                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Full 50-state reciprocity data</span></li>
+                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Contractor density heatmaps</span></li>
+                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>State-by-state requirements</span></li>
+                         </ul>
+                         <Button className="w-full" onClick={() => setIsSubscribeModalOpen(true)}>Subscribe Monthly</Button>
+                      </CardContent>
+                   </Card>
+                   
+                   <Card className="border-primary bg-primary/5 dark:bg-primary/10 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg">
+                        BEST VALUE
+                      </div>
+                      <CardHeader>
+                         <CardTitle>Annual Pass</CardTitle>
+                         <div className="text-3xl font-bold mt-2">$470<span className="text-sm text-muted-foreground font-normal">/yr</span></div>
+                         <p className="text-sm text-primary font-medium mt-1">Save 20%</p>
+                      </CardHeader>
+                      <CardContent>
+                         <ul className="text-sm space-y-3 mb-6">
+                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Everything in Monthly</span></li>
+                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Priority PDF exports</span></li>
+                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Early access to new states</span></li>
+                         </ul>
+                         <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => setIsSubscribeModalOpen(true)}>Subscribe Annually</Button>
+                      </CardContent>
+                   </Card>
+                </div>
+             </div>
           </div>
         </div>
       ) : role === 'Qualifier' ? (
@@ -1220,6 +1417,35 @@ const handleGenerateTaxReport = () => {
         </div>
       ) : (
         <div className="p-8 max-w-[1400px] mx-auto space-y-8">
+
+        {/* Compliance Alerts (Compliance Manager Only) */}
+        {role === 'Compliance Manager' && (
+          <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 shadow-sm mb-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+            <div className="flex items-start justify-between">
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-rose-900 mb-1">Compliance Action Required</h3>
+                  <p className="text-sm text-rose-700 mb-4">You have 3 licenses expiring within 30 days and 2 missing insurance certificates.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="bg-white text-rose-700 border-rose-200 hover:bg-rose-100 cursor-pointer">
+                      Review Expiring (3)
+                    </Badge>
+                    <Badge variant="outline" className="bg-white text-rose-700 border-rose-200 hover:bg-rose-100 cursor-pointer">
+                      Missing Docs (2)
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white shadow-sm">
+                Take Action
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Header Section */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50">
@@ -1465,12 +1691,14 @@ const handleGenerateTaxReport = () => {
             >
               <List className="w-4 h-4" />
             </button>
-            <button 
-              className={`p-1.5 rounded-sm transition-colors ${viewMode === 'map' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setViewMode('map')}
-            >
-              <Map className="w-4 h-4" />
-            </button>
+            {['Super Admin', 'Admin', 'Employee', 'Sales', 'Vendor'].includes(role) && (
+              <button 
+                className={`p-1.5 rounded-sm transition-colors ${viewMode === 'map' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setViewMode('map')}
+              >
+                <Map className="w-4 h-4" />
+              </button>
+            )}
             <button 
               className={`p-1.5 rounded-sm transition-colors ${viewMode === 'pipeline' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               onClick={() => setViewMode('pipeline')}
@@ -2307,10 +2535,15 @@ const handleGenerateTaxReport = () => {
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
                         Available
                       </Badge>
+                    ) : c.status === "Blacklisted" ? (
+                      <Badge variant="secondary" className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-none">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>
+                        Blacklisted
+                      </Badge>
                     ) : (
                       <Badge variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-none">
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>
-                        Unavailable
+                        {c.status}
                       </Badge>
                     )}
                     {getSequenceStatus(c) === 'active' && (
@@ -2386,10 +2619,15 @@ const handleGenerateTaxReport = () => {
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
                             Available
                           </Badge>
+                        ) : c.status === "Blacklisted" ? (
+                          <Badge variant="secondary" className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-none">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>
+                            Blacklisted
+                          </Badge>
                         ) : (
                           <Badge variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-none">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>
-                            Unavailable
+                            {c.status}
                           </Badge>
                         )}
                         {getSequenceStatus(c) === 'active' && (
@@ -2425,6 +2663,7 @@ const handleGenerateTaxReport = () => {
             </Table>
           </div>
         ) : viewMode === 'map' ? (
+          ['Super Admin', 'Admin', 'Employee', 'Sales', 'Compliance Manager'].includes(role) ? (
           <div className="bg-white rounded-xl shadow-sm border border-border/50 p-8 overflow-x-auto">
             <div className="flex justify-between items-center mb-6">
               <div>
@@ -2704,7 +2943,7 @@ const handleGenerateTaxReport = () => {
                                 <div className="font-medium text-sm">{c.name}</div>
                                 <div className="text-xs text-muted-foreground">{c.trades.join(", ")} - {c.classification}</div>
                               </div>
-                              <Badge variant={c.status === 'Available' ? 'default' : 'secondary'}>{c.status}</Badge>
+                              <Badge variant={c.status === 'Available' ? 'default' : c.status === 'Blacklisted' ? 'destructive' : 'secondary'}>{c.status}</Badge>
                             </div>
                           ))}
                         </div>
@@ -2722,7 +2961,7 @@ const handleGenerateTaxReport = () => {
                                   <div className="font-medium text-sm">{c.name}</div>
                                   <div className="text-xs text-muted-foreground">{c.trades.join(", ")} - {c.classification}</div>
                                 </div>
-                                <Badge variant={c.status === 'Available' ? 'default' : 'secondary'}>{c.status}</Badge>
+                                <Badge variant={c.status === 'Available' ? 'default' : c.status === 'Blacklisted' ? 'destructive' : 'secondary'}>{c.status}</Badge>
                               </div>
                             ))}
                           </div>
@@ -2768,6 +3007,64 @@ const handleGenerateTaxReport = () => {
             </Dialog>
           </div>
           </div>
+          ) : (
+            <div className="relative bg-white rounded-xl shadow-sm border border-border/50 p-8 overflow-hidden min-h-[800px] flex items-center justify-center">
+               {/* Blurred Map Background */}
+               <div className="absolute inset-0 filter blur-md opacity-50 pointer-events-none select-none overflow-hidden flex items-center justify-center">
+                  <div className="w-full h-full bg-slate-100 dark:bg-slate-900 grid grid-cols-12 gap-4 p-8">
+                    {Array.from({ length: 48 }).map((_, i) => (
+                      <div key={i} className="bg-slate-300 dark:bg-slate-700 rounded-md h-24 opacity-20"></div>
+                    ))}
+                  </div>
+               </div>
+               
+               {/* Paywall Overlay */}
+               <div className="relative z-10 flex flex-col items-center justify-center text-center py-20 px-4">
+                  <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6">
+                     <Lock className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-3xl font-bold mb-4">Unlock the Reciprocity Map</h3>
+                  <p className="text-lg text-muted-foreground max-w-lg mb-8">
+                    Discover licensing reciprocity across all 50 states, analyze contractor density, and identify high-potential expansion markets.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl w-full mb-10 text-left">
+                     <Card className="border-border/50 bg-white dark:bg-slate-950 shadow-sm">
+                        <CardHeader>
+                           <CardTitle>Monthly Pass</CardTitle>
+                           <div className="text-3xl font-bold mt-2">$49<span className="text-sm text-muted-foreground font-normal">/mo</span></div>
+                        </CardHeader>
+                        <CardContent>
+                           <ul className="text-sm space-y-3 mb-6">
+                              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Full 50-state reciprocity data</span></li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Contractor density heatmaps</span></li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>State-by-state requirements</span></li>
+                           </ul>
+                           <Button className="w-full" onClick={() => setIsSubscribeModalOpen(true)}>Subscribe Monthly</Button>
+                        </CardContent>
+                     </Card>
+                     
+                     <Card className="border-primary bg-primary/5 relative overflow-hidden shadow-sm">
+                        <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg">Save 20%</div>
+                        <CardHeader>
+                           <CardTitle>Annual Pass</CardTitle>
+                           <div className="text-3xl font-bold mt-2">$470<span className="text-sm text-muted-foreground font-normal">/yr</span></div>
+                        </CardHeader>
+                        <CardContent>
+                           <ul className="text-sm space-y-3 mb-6">
+                              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Everything in Monthly</span></li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>PDF Export Capabilities</span></li>
+                              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Priority support</span></li>
+                           </ul>
+                           <Button className="w-full" onClick={() => setIsSubscribeModalOpen(true)}>Subscribe Annually</Button>
+                        </CardContent>
+                     </Card>
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground">Already have a subscription? <a href="#" className="text-primary hover:underline transition-all">Contact Support</a></p>
+               </div>
+            </div>
+          )
         ) : viewMode === 'calendar' ? (
           <div className="bg-white rounded-xl shadow-sm border border-border/50 p-8">
             <h3 className="text-xl font-semibold mb-6">Renewal Calendar</h3>
@@ -5175,6 +5472,7 @@ const handleGenerateTaxReport = () => {
                         >
                           <option value="Available">Available</option>
                           <option value="Unavailable">Unavailable</option>
+                          <option value="Blacklisted">Blacklisted</option>
                         </select>
                       </FormControl>
                       <FormMessage />
@@ -5224,10 +5522,15 @@ const handleGenerateTaxReport = () => {
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
                           Available
                         </Badge>
+                      ) : selectedContractor.status === "Blacklisted" ? (
+                        <Badge variant="secondary" className="bg-rose-100 text-rose-700 border-none">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>
+                          Blacklisted
+                        </Badge>
                       ) : (
                         <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-none">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>
-                          Unavailable
+                          {selectedContractor.status}
                         </Badge>
                       )}
                       {getSequenceStatus(selectedContractor) === 'active' && (
@@ -5255,8 +5558,16 @@ const handleGenerateTaxReport = () => {
                       {selectedContractor.sequencePaused ? "Resume Sequence" : "Pause Sequence"}
                     </Button>
                   )}
+                  <Button variant="outline" size="sm" onClick={() => handleBlacklistContractor(selectedContractor.id)} className="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
+                    <ShieldAlert className="w-4 h-4 mr-2" />
+                    Blacklist
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleEditClick(selectedContractor)}>
                     Edit
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDeleteContractor(selectedContractor.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
                   </Button>
                 </div>
               </div>
@@ -6321,6 +6632,57 @@ const handleGenerateTaxReport = () => {
               toast.success("Payment method updated securely via Stripe integration");
               setIsPaymentModalOpen(false);
             }}>Save Card</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSubscribeModalOpen} onOpenChange={setIsSubscribeModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Subscribe to Reciprocity Map</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 border border-border/50 rounded-lg bg-muted/10 space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold flex items-center gap-2"><CreditCard className="w-4 h-4 text-primary" /> Payment Details</span>
+                <div className="flex gap-1">
+                  <div className="w-8 h-5 bg-blue-600 rounded flex items-center justify-center text-[8px] text-white font-bold">VISA</div>
+                  <div className="w-8 h-5 bg-orange-500 rounded flex items-center justify-center text-[8px] text-white font-bold">MC</div>
+                  <div className="w-8 h-5 bg-slate-800 rounded flex items-center justify-center text-[8px] text-white font-bold">AMEX</div>
+                </div>
+              </div>
+              <div className="space-y-4 bg-white dark:bg-slate-950 p-4 rounded-md border border-border shadow-sm">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Card Information</label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+                    <Input placeholder="Card number" className="pl-9 rounded-b-none border-b-0 focus-visible:z-10" />
+                  </div>
+                  <div className="grid grid-cols-2">
+                    <Input placeholder="MM / YY" className="rounded-t-none rounded-br-none focus-visible:z-10" />
+                    <div className="relative">
+                      <Input placeholder="CVC" className="rounded-t-none rounded-bl-none border-l-0 focus-visible:z-10" type="password" />
+                      <Lock className="absolute right-3 top-2.5 w-4 h-4 text-muted-foreground opacity-50" />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Cardholder Name</label>
+                  <Input placeholder="John Doe" />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <Lock className="w-3 h-3" />
+              <span>Payments are processed securely via Stripe.</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSubscribeModalOpen(false)}>Cancel</Button>
+            <Button onClick={() => {
+              toast.success("Subscription activated securely via Stripe integration!");
+              setIsSubscribeModalOpen(false);
+            }}>Confirm Payment</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
