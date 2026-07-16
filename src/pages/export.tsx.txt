@@ -1,0 +1,101 @@
+import { useState } from 'react';
+import { Layout } from '@/components/Layout';
+import { FileText, ArrowRight } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+// Load files robustly to prevent empty content issues
+const allFiles = import.meta.glob('/src/**/*.{ts,tsx,css}', { query: '?raw', import: 'default', eager: true });
+
+const TARGET_FILES = [
+  '/src/pages/Export.tsx',
+  '/src/App.tsx',
+  '/src/components/Layout.tsx',
+  '/src/pages/Index.tsx',
+  '/src/components/ProtectedRoute.tsx',
+  '/src/lib/RoleContext.tsx',
+  '/src/pages/Login.tsx',
+  '/src/pages/Profile.tsx',
+  '/src/pages/Onboarding.tsx',
+  '/src/pages/Reports.tsx',
+  '/src/pages/Roles.tsx',
+  '/src/pages/Library.tsx',
+  '/src/pages/Invoicing.tsx',
+  '/src/pages/Settings.tsx',
+  '/src/index.css'
+];
+
+const Export = () => {
+  const [selectedFile, setSelectedFile] = useState<string | null>(TARGET_FILES[0] || null);
+
+  const findFileContent = (path: string) => {
+    if (allFiles[path]) return allFiles[path] as string;
+    const filename = path.split('/').pop();
+    const matchingKey = Object.keys(allFiles).find(key => key.endsWith(`/${filename}`));
+    if (matchingKey) return allFiles[matchingKey] as string;
+    return `// Error: File content for ${path} could not be loaded dynamically.`;
+  };
+
+  const fileContent = selectedFile ? findFileContent(selectedFile) : 'Select a file to view its code.';
+
+  return (
+    <Layout>
+      <div className="p-8 max-w-6xl mx-auto space-y-6">
+        <h1 className="text-3xl font-bold">Export Project</h1>
+        <p className="text-muted-foreground">
+          Since your browser's security is blocking the copy button, I've made it so you can just copy the text directly.
+        </p>
+
+        <div className="border rounded-md mt-4 flex flex-col md:flex-row min-h-[600px]">
+          {/* Left Sidebar - File List */}
+          <div className="w-full md:w-1/3 border-b md:border-b-0 md:border-r flex flex-col bg-card">
+            <div className="p-4 border-b bg-muted/30">
+              <div className="font-medium">Files to Update</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select a file to view its code.
+              </p>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {TARGET_FILES.map((path) => (
+                  <button
+                    key={path}
+                    onClick={() => setSelectedFile(path)}
+                    className={`w-full text-left flex items-center p-3 rounded-md text-sm transition-all ${
+                      selectedFile === path 
+                        ? 'bg-primary/10 text-primary font-medium' 
+                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    <span className="truncate">{path.split('/').pop()}</span>
+                    {selectedFile === path && <ArrowRight className="w-4 h-4 ml-auto" />}
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Right Content - Text Area */}
+          <div className="w-full md:w-2/3 flex flex-col bg-background">
+            <div className="p-4 border-b bg-muted/30 flex justify-between items-center">
+              <div className="font-medium text-sm font-mono">{selectedFile?.replace(/^\//, '')}</div>
+              <div className="text-xs text-muted-foreground font-semibold text-primary">
+                Click inside the box below, press Ctrl+C (or Cmd+C) to copy
+              </div>
+            </div>
+            <div className="flex-1 p-0 relative">
+              <textarea
+                className="absolute inset-0 w-full h-full p-4 font-mono text-xs bg-muted/10 resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={fileContent}
+                readOnly
+                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+};
+
+export default Export;
