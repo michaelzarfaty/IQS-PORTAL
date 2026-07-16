@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
+import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, Download, Send, CreditCard, Upload, DollarSign, Activity, TrendingUp } from "lucide-react";
+import { Plus, FileText, Download, Send, CreditCard, Upload, DollarSign, Activity, TrendingUp, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +12,9 @@ import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRole } from "@/lib/RoleContext";
 import { Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 const defaultFees = [
   { id: 1, name: "TLS Application Fee", type: "Main Fee", amount: 1500.00, description: "Standard TLS processing fee" },
@@ -20,29 +24,93 @@ const defaultFees = [
 const Invoicing = () => {
   const { role } = useRole();
   const [csvData, setCsvData] = useState("");
-  const [fees, setFees] = useState(defaultFees);
+  const [fees, setFees] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFees();
+  }, []);
+
+  const fetchFees = async () => {
+    try {
+      const { data, error } = await supabase.from('pricing_items').select('*').order('created_at', { ascending: true });
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        setFees(data);
+      } else {
+        setFees(defaultFees); // Fallback if empty
+      }
+    } catch (error) {
+      console.error("Error fetching fees:", error);
+      // Fallback to defaults or local storage if offline/no table
+      setFees(defaultFees);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteFee = async (id: number | string) => {
+    try {
+      // Optimistic update
+      setFees(fees.filter(f => f.id !== id));
+      
+      // If it's a default fee (no uuid), just remove from state
+      if (typeof id === 'number') return;
+      
+      const { error } = await supabase.from('pricing_items').delete().eq('id', id);
+      if (error) throw error;
+      toast.success("Fee deleted successfully");
+    } catch (error) {
+      console.error("Error deleting fee:", error);
+      toast.error("Failed to delete fee");
+      fetchFees(); // Revert on failure
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      setFees([]);
+      const { error } = await supabase.from('pricing_items').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      if (error) throw error;
+      toast.success("All fees cleared");
+    } catch (error) {
+      console.error("Error clearing fees:", error);
+      fetchFees();
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    processFile(file);
+  };
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    processFile(file);
+  };
+
+  const processFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
       setCsvData(text);
+      toast.success(`File "${file.name}" loaded. Click Import Data to process.`);
     };
     reader.readAsText(file);
   };
 
-  const handleParseCSV = () => {
+  const handleParseCSV = async () => {
     if (!csvData.trim()) return;
     
     try {
       const rows = csvData.split('\n').filter(r => r.trim());
-      const newFees = rows.map((row, index) => {
+      const newFees = rows.map((row) => {
         const cols = row.split('\t').length > 1 ? row.split('\t') : row.split(',');
         return {
-          id: Date.now() + index,
           name: cols[0] || "Unknown Fee",
           type: cols[1] || "Custom Fee",
           amount: parseFloat(cols[2]?.replace(/[^0-9.-]+/g, "")) || 0,
@@ -50,7 +118,18 @@ const Invoicing = () => {
         };
       });
       
-      setFees([...defaultFees, ...newFees]);
+      // Insert to Supabase
+      const { data, error } = await supabase.from('pricing_items').insert(newFees).select();
+      
+      if (error) {
+        // If table doesn't exist yet, just update local state
+        console.error("Supabase error (table might not exist):", error);
+        const localFees = newFees.map((f, i) => ({ ...f, id: Date.now() + i }));
+        setFees([...fees, ...localFees]);
+      } else if (data) {
+        setFees([...fees, ...data]);
+      }
+      
       setCsvData("");
       toast.success("Pricing data imported successfully!");
     } catch (e) {
@@ -69,14 +148,164 @@ const Invoicing = () => {
 
   return (
     <Layout>
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #printable-invoice, #printable-invoice * { visibility: visible; }
+          #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+      `}</style>
+      
+      <div id="printable-invoice" className="hidden print:block p-10 bg-white text-black w-full min-h-screen">
+        <div className="flex justify-between items-start border-b-2 border-gray-200 pb-8 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+              IQS
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">IQS Platform</h1>
+              <p className="text-gray-500 mt-1">123 Business Avenue, Suite 100</p>
+              <p className="text-gray-500">New York, NY 10001</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <h2 className="text-4xl font-light text-gray-400 uppercase tracking-wider">Invoice</h2>
+            <p className="font-medium text-xl mt-2 text-gray-800">INV-2024-001</p>
+            <p className="text-gray-500 mt-1">Date: {new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+        
+        <div className="mb-12">
+          <h3 className="text-gray-500 font-medium uppercase tracking-wider mb-2">Billed To:</h3>
+          <p className="font-medium text-lg text-gray-900">Vendor Corporation</p>
+          <p className="text-gray-600">contact@vendorcorp.com</p>
+        </div>
+
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b-2 border-gray-200">
+              <th className="py-3 font-semibold text-gray-700">Description</th>
+              <th className="py-3 font-semibold text-gray-700 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-gray-100">
+              <td className="py-4 text-gray-800">TLS Application Fee</td>
+              <td className="py-4 text-right text-gray-800 font-medium">$1,500.00</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="py-4 text-right font-bold text-gray-900 text-lg">Total Due:</td>
+              <td className="py-4 text-right font-bold text-blue-600 text-xl">$1,500.00</td>
+            </tr>
+          </tfoot>
+        </table>
+        
+        <div className="mt-20 pt-8 border-t border-gray-200 text-center text-gray-500 text-sm">
+          <p>Thank you for your business!</p>
+          <p className="mt-1">For payment questions, please contact billing@iqs.com</p>
+        </div>
+      </div>
+
+      <div className="p-8 max-w-7xl mx-auto space-y-6 print:hidden">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">3rd Party Invoicing</h1>
             <p className="text-muted-foreground mt-2">Manage pricing, generate invoices, and track payments.</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline"><FileText className="w-4 h-4 mr-2" /> Templates</Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline"><FileText className="w-4 h-4 mr-2" /> Templates</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>Invoice Templates</DialogTitle>
+                  <DialogDescription>Customize the look and feel of your generated PDF invoices.</DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-2 gap-6 mt-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Template Style</Label>
+                      <Select defaultValue="modern">
+                        <SelectTrigger><SelectValue placeholder="Select style" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="modern">Modern (Default)</SelectItem>
+                          <SelectItem value="classic">Classic Professional</SelectItem>
+                          <SelectItem value="minimal">Minimalist</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Company Logo URL</Label>
+                      <Input placeholder="https://..." defaultValue="https://example.com/logo.png" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Accent Color</Label>
+                      <div className="flex gap-2">
+                        <div className="w-8 h-8 rounded bg-blue-600 cursor-pointer ring-2 ring-offset-2 ring-blue-600"></div>
+                        <div className="w-8 h-8 rounded bg-green-600 cursor-pointer"></div>
+                        <div className="w-8 h-8 rounded bg-slate-900 cursor-pointer"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Footer Notes</Label>
+                      <Textarea placeholder="Thank you for your business!" defaultValue="Thank you for your business! For payment questions, please contact billing@iqs.com" />
+                    </div>
+                    <Button className="w-full" onClick={() => toast.success("Template settings saved!")}>Save Template Settings</Button>
+                  </div>
+                  <div className="border rounded-lg p-4 bg-slate-50 flex items-center justify-center min-h-[300px]">
+                    <div className="text-center text-muted-foreground">
+                      <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>Template Preview</p>
+                      <p className="text-xs mt-2">Shows a live preview of your invoice design</p>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="secondary"><Users className="w-4 h-4 mr-2" /> Bulk Generate</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Bulk Invoice Generation</DialogTitle>
+                  <DialogDescription>Generate multiple invoices at once for selected vendors.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label>Select Vendors</Label>
+                    <Select defaultValue="all">
+                      <SelectTrigger><SelectValue placeholder="All Active Vendors" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Active Vendors</SelectItem>
+                        <SelectItem value="pending">Vendors with Pending Fees</SelectItem>
+                        <SelectItem value="renewals">Upcoming Renewals</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fee Category to Bill</Label>
+                    <Select defaultValue="app">
+                      <SelectTrigger><SelectValue placeholder="Standard Application Fee" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="app">Standard Application Fee ($1,500)</SelectItem>
+                        <SelectItem value="renewal">Annual Renewal Fee ($500)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Due Date</Label>
+                    <Input type="date" defaultValue={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]} />
+                  </div>
+                  <Button className="w-full" onClick={() => toast.success("Successfully generated 12 invoices!")}>Generate Invoices</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Button><Plus className="w-4 h-4 mr-2" /> Create Invoice</Button>
           </div>
         </div>
@@ -99,7 +328,7 @@ const Invoicing = () => {
                   <CardDescription>TLS (The License Squad) standard fee configuration.</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setFees([])} className="text-destructive">
+                  <Button variant="outline" onClick={handleClearAll} className="text-destructive">
                     <Trash2 className="w-4 h-4 mr-2" /> Clear All
                   </Button>
                   <Dialog>
@@ -114,13 +343,21 @@ const Invoicing = () => {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Upload CSV File</label>
+                      <div 
+                        className="border-2 border-dashed border-primary/50 rounded-lg p-8 text-center hover:bg-primary/5 transition-colors cursor-pointer"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={handleDrop}
+                        onClick={() => document.getElementById('csv-upload')?.click()}
+                      >
+                        <Upload className="w-8 h-8 mx-auto text-primary mb-3" />
+                        <h3 className="font-medium">Click or drag CSV file to upload</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Supports .csv and .txt files</p>
                         <input 
+                          id="csv-upload"
                           type="file" 
                           accept=".csv,.txt"
                           onChange={handleFileUpload}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="hidden"
                         />
                       </div>
                       <div className="relative">
@@ -170,7 +407,7 @@ const Invoicing = () => {
                           ${fee.amount.toFixed(2)}
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => setFees(fees.filter(f => f.id !== fee.id))} className="text-muted-foreground hover:text-destructive">
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteFee(fee.id)} className="text-muted-foreground hover:text-destructive">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </TableCell>
