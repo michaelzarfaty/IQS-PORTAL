@@ -235,7 +235,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
             />
           </SidebarGroup>
 
-          <SidebarGroup title="MONEY" allowedRoles={[...INTERNAL_ROLES, 'Client']}>
+          <SidebarGroup title="MONEY" allowedRoles={[...INTERNAL_ROLES, 'Client', 'Vendor']}>
             <SidebarItem 
               icon={<Receipt className="w-4 h-4" />} 
               label="Invoices" 
@@ -267,7 +267,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
               label="3rd Party Invoicing" 
               href="/invoicing" 
               isActive={location.pathname === "/invoicing"}
-              allowedRoles={[...INTERNAL_ROLES]}
+              allowedRoles={[...INTERNAL_ROLES, 'Vendor', 'Client']}
             />
           </SidebarGroup>
 
