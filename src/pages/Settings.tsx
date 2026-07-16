@@ -16,10 +16,10 @@ const Settings = () => {
     status: "verified"
   });
   const [smtpSettings, setSmtpSettings] = useState({
-    host: "smtp.gmail.com",
-    port: "587",
-    user: "admin@iqs.com",
-    pass: "********"
+    host: localStorage.getItem('smtpHost') || "",
+    port: localStorage.getItem('smtpPort') || "587",
+    user: localStorage.getItem('smtpUser') || "",
+    pass: localStorage.getItem('smtpPass') || ""
   });
   const [supabaseSettings, setSupabaseSettings] = useState({
     url: localStorage.getItem('supabaseUrl') || '',
@@ -46,12 +46,21 @@ const Settings = () => {
   };
 
   const handleSaveSmtp = () => {
+    localStorage.setItem('smtpHost', smtpSettings.host);
+    localStorage.setItem('smtpPort', smtpSettings.port);
+    localStorage.setItem('smtpUser', smtpSettings.user);
+    localStorage.setItem('smtpPass', smtpSettings.pass);
     toast.success("SMTP Settings saved successfully!");
   };
 
   const handleSaveSupabase = () => {
-    localStorage.setItem('supabaseUrl', supabaseSettings.url);
-    localStorage.setItem('supabaseAnonKey', supabaseSettings.key);
+    let cleanUrl = supabaseSettings.url.trim();
+    if (cleanUrl && !cleanUrl.startsWith('http')) {
+      cleanUrl = 'https://' + cleanUrl;
+    }
+    
+    localStorage.setItem('supabaseUrl', cleanUrl);
+    localStorage.setItem('supabaseAnonKey', supabaseSettings.key.trim());
     toast.success("Supabase Database settings saved successfully! Reloading...");
     setTimeout(() => {
       window.location.reload();
@@ -66,7 +75,7 @@ const Settings = () => {
           <p className="text-muted-foreground">Manage integrations, email connections, and platform preferences.</p>
         </div>
 
-        <Tabs defaultValue="email" className="w-full">
+        <Tabs defaultValue="database" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="email" className="flex items-center gap-2"><Mail className="w-4 h-4" /> Email Integrations</TabsTrigger>
             <TabsTrigger value="calendar" className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Calendar</TabsTrigger>
@@ -247,13 +256,20 @@ const Settings = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
+                  <Label>Stripe Publishable Key</Label>
+                  <Input type="text" placeholder="pk_test_51Nx..." defaultValue={localStorage.getItem('stripePk') || ''} onChange={(e) => localStorage.setItem('stripePk', e.target.value)} />
+                </div>
+                <div className="space-y-2">
                   <Label>Stripe Secret Key</Label>
-                  <Input type="password" value="sk_test_51NxXXXXXXXXXXXXXXXXXXXXXXXXXX" readOnly />
+                  <Input type="password" placeholder="sk_test_51Nx..." defaultValue={localStorage.getItem('stripeSk') || ''} onChange={(e) => localStorage.setItem('stripeSk', e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>AvocoLab CRM API Key</Label>
                   <Input type="password" value="av_live_XXXXXXXXXXXXXXXXXXXXXXXXXX" readOnly />
                 </div>
+                <Button onClick={() => toast.success("API Keys saved successfully!")}>
+                  <Save className="w-4 h-4 mr-2" /> Save API Keys
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -266,7 +282,7 @@ const Settings = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Project URL</Label>
+                  <Label>Supabase Project URL</Label>
                   <Input 
                     placeholder="https://xyzcompany.supabase.co" 
                     value={supabaseSettings.url}
