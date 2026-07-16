@@ -11,7 +11,7 @@ import Onboarding from "./pages/Onboarding";
 import Retention from "./pages/Retention";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
-import Export from "./pages/Export";
+import Export from "./pages/ExportPage";
 import Profile from "./pages/Profile";
 import Library from "./pages/Library";
 import Invoicing from "./pages/Invoicing";
