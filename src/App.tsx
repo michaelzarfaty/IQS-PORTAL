@@ -11,7 +11,6 @@ import Onboarding from "./pages/Onboarding";
 import Retention from "./pages/Retention";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
-import Profile from "./pages/Profile";
 import Library from "./pages/Library";
 import { RoleProvider } from "./lib/RoleContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -34,7 +33,6 @@ const App = () => (
             <Route path="/retention" element={<ProtectedRoute><Retention /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
       </BrowserRouter>
