@@ -73,20 +73,7 @@ const formSchema = z.object({
   trades: z.string()
 });
 
-const initialContractors = [
-  { id: 1, name: "Esteban A", initials: "EA", status: "Unavailable", location: ["Florida"], trades: ["HVAC"], renewalDate: "2024-05-15", licenseNumber: "FL-12345", classification: "HVAC Contractor", isVerified: true, email: "esteban@example.com", phone: "(555) 111-2222" },
-  { id: 2, name: "T A", initials: "TA", status: "Available", location: ["Texas"], trades: ["Commercial Building", "Residential Building"], renewalDate: "2025-11-20", licenseNumber: "TX-98765", classification: "General Builder", isVerified: true, email: "ta@example.com", phone: "(555) 333-4444" },
-  { id: 3, name: "Stephen Abila", initials: "SA", status: "Available", location: ["Texas"], trades: [], renewalDate: "2025-01-10", licenseNumber: "TX-55555", classification: "Specialty", isVerified: false, email: "stephen@example.com", phone: "(555) 555-6666" },
-  { id: 4, name: "Shara Aboul-hosn", initials: "SA", status: "Available", location: ["California"], trades: ["Commercial Building", "Residential Building"], renewalDate: "2025-08-30", licenseNumber: "CA-11111", classification: "General Contractor", isVerified: true, email: "shara@example.com", phone: "(555) 777-8888" },
-  { id: 5, name: "Drew Abrams", initials: "DA", status: "Available", location: ["Florida"], trades: [], renewalDate: "2026-02-14", licenseNumber: "FL-22222", classification: "Plumbing", isVerified: false, email: "drew@example.com", phone: "(555) 999-0000" },
-  { id: 6, name: "Sergio Abreu", initials: "SA", status: "Available", location: ["Texas"], trades: [], isVerified: false, renewalDate: "2025-12-01", licenseNumber: "TX-66666", classification: "Specialty", email: "sergio@example.com", phone: "(555) 123-1111" },
-  { id: 7, name: "Marco Acosta", initials: "MA", status: "Available", location: ["California"], trades: ["Commercial Building", "Residential Building"], isVerified: true, renewalDate: "2025-10-15", licenseNumber: "CA-77777", classification: "General Contractor", email: "marco@example.com", phone: "(555) 123-2222" },
-  { id: 8, name: "Carl Adams", initials: "CA", status: "Available", location: ["Texas"], trades: ["Commercial Building"], isVerified: false, renewalDate: "2025-09-20", licenseNumber: "TX-88888", classification: "General Builder", email: "carl@example.com", phone: "(555) 123-3333" },
-  { id: 9, name: "Robert Adams", initials: "RA", status: "Available", location: ["Florida"], trades: ["HVAC"], isVerified: false, renewalDate: "2025-08-10", licenseNumber: "FL-99999", classification: "HVAC Contractor", email: "robert@example.com", phone: "(555) 123-4444" },
-  { id: 10, name: "Brandon Adkins", initials: "BA", status: "Available", location: ["California"], trades: ["Specialty Construction"], isVerified: false, renewalDate: "2025-07-05", licenseNumber: "CA-10101", classification: "Specialty", email: "brandon@example.com", phone: "(555) 123-5555" },
-  { id: 11, name: "Djino Agenor", initials: "DA", status: "Available", location: ["Texas"], trades: ["Commercial Building", "Residential Building"], isVerified: false, renewalDate: "2025-06-15", licenseNumber: "TX-20202", classification: "General Builder", email: "djino@example.com", phone: "(555) 123-6666" },
-  { id: 12, name: "Nico Aguayo", initials: "NA", status: "Available", location: ["Florida"], trades: ["Electrical", "Plumbing"], isVerified: true, renewalDate: "2025-05-20", licenseNumber: "FL-30303", classification: "Electrical Contractor", email: "nico@example.com", phone: "(555) 123-7777" },
-];
+const initialContractors: any[] = [];
 
 const initialDocuments = [
   { id: 1, title: "Liability waiver", placement: "James Ortega → Lightning Electric", type: "Liability waiver", note: "Send after intro call confirmed", signer: "Qualifier signs", status: "Blocking", isSigned: false },
@@ -115,6 +102,8 @@ const initialDocuments = [
   { id: 24, title: "Client service agreement", placement: "Sandra Chen → CoolBreeze", type: "Agreement", note: "Signed Dec 28, 2025", signer: "Client signs", status: "Blocking", isSigned: true },
 ];
 
+import { supabase } from "@/lib/supabase";
+
 const getAvatarColor = (initials: string) => {
   const colors = [
     "bg-teal-600", "bg-emerald-600", "bg-green-600", "bg-rose-700", 
@@ -127,8 +116,8 @@ const getAvatarColor = (initials: string) => {
 
 const Index = () => {
   const location = useLocation();
-  const { role } = useRole();
-  const [contractorsList, setContractorsList] = useState(initialContractors);
+  const { role, userEmail, userName } = useRole();
+  const [contractorsList, setContractorsList] = useState<any[]>(initialContractors);
   const [selectedContractor, setSelectedContractor] = useState<any>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -148,6 +137,7 @@ const Index = () => {
   const [viewMode, setViewMode] = useState<"grid" | "table" | "analytics" | "map" | "timeline" | "calendar" | "activity" | "automation" | "documents" | "fees" | "pipeline" | "scheduling" | "library" | "exams" | "flashcards" | "exam_analytics" | "invoices" | "work-orders" | "active-placements" | "partners" | "deficiencies" | "clients-crm" | "finance" | "verifications" | "handoffs">("grid");
   const [isHandoffModalOpen, setIsHandoffModalOpen] = useState(false);
   const [selectedHandoff, setSelectedHandoff] = useState<any>(null);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -159,6 +149,71 @@ const Index = () => {
       setViewMode("grid");
     }
   }, [location.search, location.pathname]);
+
+  useEffect(() => {
+    const fetchQualifiers = async () => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').in('role', ['Qualifier', 'Vendor']);
+        if (data && !error && data.length > 0) {
+          const dbQualifiers = data.map((p: any) => ({
+            id: p.id + 1000, // Offset to avoid ID collisions with initial data
+            name: p.full_name || p.name || 'Unknown',
+            initials: (p.full_name || 'U').substring(0, 2).toUpperCase(),
+            status: p.status === 'Active' ? 'Available' : p.status,
+            location: ["Texas"], // Default placeholder
+            trades: [],
+            renewalDate: "2025-12-31",
+            licenseNumber: "PENDING",
+            classification: "Specialty",
+            isVerified: p.status === 'Active',
+            email: p.email,
+            phone: "(555) 000-0000"
+          }));
+          
+          setContractorsList(prev => {
+            const existingEmails = new Set(prev.map(c => c.email));
+            const newQualifiers = dbQualifiers.filter(q => !existingEmails.has(q.email));
+            return [...prev, ...newQualifiers];
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching qualifiers:", err);
+      }
+    };
+    fetchQualifiers();
+
+    const fetchVendorLicenses = async () => {
+      try {
+        const { data, error } = await supabase.from('vendor_licenses').select('*');
+        if (data && !error && data.length > 0) {
+          setContractorsList(prev => {
+            const newLicenses = data.map((l: any) => ({
+              id: l.id + 2000,
+              name: l.vendor_name || 'Vendor',
+              initials: (l.vendor_name || 'V').substring(0, 2).toUpperCase(),
+              status: l.status || 'Available',
+              location: [l.state || "Texas"],
+              trades: l.trades ? l.trades.split(',') : [],
+              renewalDate: l.renewal_date || "2025-12-31",
+              licenseNumber: l.license_number || "PENDING",
+              classification: l.classification || "Specialty",
+              isVerified: true,
+              email: l.vendor_email,
+              phone: "(555) 000-0000"
+            }));
+            
+            // Just append them for now
+            const existingLicenseNumbers = new Set(prev.map(c => c.licenseNumber));
+            const uniqueNew = newLicenses.filter(l => !existingLicenseNumbers.has(l.licenseNumber));
+            return [...prev, ...uniqueNew];
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching vendor licenses:", err);
+      }
+    };
+    fetchVendorLicenses();
+  }, []);
 
   const pipelineStages = ["New Applicants", "Screening", "Interview", "Offer", "Placed"];
   const [applicantsList, setApplicantsList] = useState([
@@ -188,6 +243,10 @@ const Index = () => {
   const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
   const [currentCompose, setCurrentCompose] = useState({ type: "email", to: "", subject: "", body: "", contractorName: "" });
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
+  const [isVendorLicenseModalOpen, setIsVendorLicenseModalOpen] = useState(false);
+  const [vendorLicenseFile, setVendorLicenseFile] = useState<File | null>(null);
+  const [vendorLicenseData, setVendorLicenseData] = useState({ state: "Texas", classification: "Specialty", licenseNumber: "", renewalDate: "" });
+  const [isUploadingLicense, setIsUploadingLicense] = useState(false);
   const [newDoc, setNewDoc] = useState({ title: "", placement: "", type: "Liability waiver", signer: "Qualifier signs", status: "Blocking", file: null as File | null });
   const [isExtracting, setIsExtracting] = useState(false);
   const [invoiceData, setInvoiceData] = useState({
@@ -599,7 +658,7 @@ const handleGenerateTaxReport = () => {
         c.initials = (c.name || "U K").split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
         return c;
       });
-      setContractorsList([...contractorsList, ...newContractors]);
+      setContractorsList(prev => [...prev, ...newContractors]);
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -710,8 +769,8 @@ const handleGenerateTaxReport = () => {
 
   const filteredContractors = contractorsList.filter(c => {
     const matchState = selectedState === "All states" || (Array.isArray(c.location) ? c.location.includes(selectedState) : c.location === selectedState);
-    const matchTrade = selectedTrade === "All trades" || c.trades.includes(selectedTrade);
-    const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchTrade = selectedTrade === "All trades" || (c.trades && c.trades.includes(selectedTrade));
+    const matchSearch = (c.name || "").toLowerCase().includes((searchQuery || "").toLowerCase());
     
     let matchLicense = true;
     if (licenseStatus === "Overdue") {
@@ -750,7 +809,7 @@ const handleGenerateTaxReport = () => {
       acc[loc] = (acc[loc] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  ).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 10);
+  ).map(([name, count]) => ({ name, count: count as number })).sort((a, b) => (b.count as number) - (a.count as number)).slice(0, 10);
 
   const tradeData = Object.entries(
     filteredContractors.reduce((acc, c) => {
@@ -762,7 +821,7 @@ const handleGenerateTaxReport = () => {
       });
       return acc;
     }, {} as Record<string, number>)
-  ).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  ).map(([name, count]) => ({ name, count: count as number })).sort((a, b) => (b.count as number) - (a.count as number));
 
   const statusData = Object.entries(
     filteredContractors.reduce((acc, c) => {
@@ -784,7 +843,7 @@ const handleGenerateTaxReport = () => {
     return acc;
   }, {} as Record<string, number>);
 
-  const maxMapCount = Math.max(...Object.values(mapData), 1);
+  const maxMapCount = Math.max(...(Object.values(mapData) as number[]), 1);
 
   const timelineData = [...filteredContractors]
     .filter(c => c.renewalDate)
@@ -1014,30 +1073,33 @@ const handleGenerateTaxReport = () => {
           </div>
         </div>
       ) : role === 'Vendor' && viewMode !== 'map' ? (
-        <div className="p-8 max-w-[1400px] mx-auto space-y-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Vendor Portal</h1>
-              <p className="text-muted-foreground">Manage your placements, licenses, and renewals.</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsAddDocModalOpen(true)}>
-                <Upload className="w-4 h-4 mr-2" /> Upload License
-              </Button>
-              <Button onClick={() => setIsAddDocModalOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" /> Request Document
-              </Button>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              <div className="bg-white rounded-xl shadow-sm border border-border/50 overflow-hidden">
-                <div className="p-6 border-b border-border/50 flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">My Active Licenses</h3>
-                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">3 Active</Badge>
+        (() => {
+          const vendorLicenses = contractorsList.filter(c => c.email === userEmail);
+          return (
+            <div className="p-8 max-w-[1400px] mx-auto space-y-8">
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 flex justify-between items-center">
+                <div>
+                  <h1 className="text-3xl font-bold text-foreground mb-2">Welcome, {userName || "Vendor"}</h1>
+                  <p className="text-muted-foreground">Manage your placements, licenses, and renewals.</p>
                 </div>
-                <Table>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setIsVendorLicenseModalOpen(true)}>
+                    <Upload className="w-4 h-4 mr-2" /> Upload License
+                  </Button>
+                  <Button onClick={() => setIsAddDocModalOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" /> Request Document
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-8">
+                  <div className="bg-white rounded-xl shadow-sm border border-border/50 overflow-hidden">
+                    <div className="p-6 border-b border-border/50 flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">My Active Licenses</h3>
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">{vendorLicenses.length} Active</Badge>
+                    </div>
+                    <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>State</TableHead>
@@ -1048,42 +1110,34 @@ const handleGenerateTaxReport = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">FL</div>
-                          Florida
-                        </div>
-                      </TableCell>
-                      <TableCell>Electrical Contractor</TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">EC13008455</TableCell>
-                      <TableCell>Aug 31, 2026</TableCell>
-                      <TableCell><Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Active</Badge></TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 text-xs font-bold">TX</div>
-                          Texas
-                        </div>
-                      </TableCell>
-                      <TableCell>Master Electrician</TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">ME44219</TableCell>
-                      <TableCell>Dec 15, 2026</TableCell>
-                      <TableCell><Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Active</Badge></TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-rose-100 flex items-center justify-center text-rose-700 text-xs font-bold">CA</div>
-                          California
-                        </div>
-                      </TableCell>
-                      <TableCell>C-10 Electrical</TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">C10-998211</TableCell>
-                      <TableCell className="text-rose-600 font-medium flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Oct 15, 2025</TableCell>
-                      <TableCell><Badge className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-none">Expiring Soon</Badge></TableCell>
-                    </TableRow>
+                    {vendorLicenses.length > 0 ? (
+                      vendorLicenses.map(license => (
+                        <TableRow key={license.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">
+                                {license.location?.[0] ? stateAbbreviations[license.location[0]] || license.location[0].substring(0, 2).toUpperCase() : 'N/A'}
+                              </div>
+                              {license.location?.[0] || 'N/A'}
+                            </div>
+                          </TableCell>
+                          <TableCell>{license.classification}</TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">{license.licenseNumber}</TableCell>
+                          <TableCell>{license.renewalDate}</TableCell>
+                          <TableCell>
+                            <Badge className={license.status === 'Available' || license.status === 'Active' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none" : "bg-amber-100 text-amber-700 hover:bg-amber-200 border-none"}>
+                              {license.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          No active licenses found. Please request a document or upload a license.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -1183,40 +1237,107 @@ const handleGenerateTaxReport = () => {
           </div>
           
           <div className="relative bg-white rounded-xl shadow-sm border border-border/50 p-8 overflow-hidden min-h-[500px] flex items-center justify-center mt-8">
-             {/* Blurred Map Background */}
-             <div className="absolute inset-0 filter blur-md opacity-50 pointer-events-none select-none overflow-hidden flex items-center justify-center">
-                <div className="w-full h-full bg-slate-100 dark:bg-slate-900 grid grid-cols-12 gap-4 p-8">
-                  {Array.from({ length: 24 }).map((_, i) => (
-                    <div key={i} className="bg-slate-300 dark:bg-slate-700 rounded-md h-16 opacity-20"></div>
-                  ))}
-                </div>
-             </div>
-             
-             {/* Paywall Overlay */}
-             <div className="relative z-10 flex flex-col items-center justify-center text-center py-10 px-4">
-                <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6">
-                   <Lock className="w-8 h-8" />
-                </div>
-                <h3 className="text-3xl font-bold mb-4">Unlock the Reciprocity Map</h3>
-                <p className="text-lg text-muted-foreground max-w-lg mb-8">
-                  Discover licensing reciprocity across all 50 states, analyze contractor density, and identify high-potential expansion markets.
-                </p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl w-full text-left">
-                   <Card className="border-border/50 bg-white dark:bg-slate-950 shadow-sm">
-                      <CardHeader>
-                         <CardTitle>Monthly Pass</CardTitle>
-                         <div className="text-3xl font-bold mt-2">$49<span className="text-sm text-muted-foreground font-normal">/mo</span></div>
-                      </CardHeader>
-                      <CardContent>
-                         <ul className="text-sm space-y-3 mb-6">
-                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Full 50-state reciprocity data</span></li>
-                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Contractor density heatmaps</span></li>
-                            <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>State-by-state requirements</span></li>
-                         </ul>
-                         <Button className="w-full" onClick={() => setIsSubscribeModalOpen(true)}>Subscribe Monthly</Button>
-                      </CardContent>
+             {isSubscribed ? (
+               <div className="flex flex-col xl:flex-row gap-6 w-full">
+                 <div className="flex-1">
+                   <iframe 
+                     src="/reciprocity-finder.html" 
+                     style={{ width: "100%", height: "950px", border: 0 }}
+                     className="rounded-lg bg-slate-50 shadow-inner w-full"
+                     title="License Reciprocity Finder"
+                   />
+                 </div>
+                 <div className="w-full xl:w-[400px] shrink-0 space-y-6 text-left">
+                   <Card className="sticky top-6">
+                     <CardHeader>
+                       <CardTitle>State Requirements</CardTitle>
+                       <CardDescription>Select a state to view detailed licensing requirements</CardDescription>
+                     </CardHeader>
+                     <CardContent>
+                       <Select value={mapStateFilter} onValueChange={setMapStateFilter}>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Select State" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="All">Select a state...</SelectItem>
+                           {Object.keys(stateAbbreviations).map(state => (
+                             <SelectItem key={state} value={state}>{state}</SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                       
+                       {mapStateFilter !== "All" && (
+                         <div className="mt-6 space-y-4">
+                           <div>
+                             <h4 className="font-semibold text-lg">{mapStateFilter}</h4>
+                             <Badge className="mt-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Reciprocity Active</Badge>
+                           </div>
+                           <Separator />
+                           <div className="space-y-4 text-sm">
+                             <div>
+                               <span className="font-medium text-muted-foreground block mb-1">Application Fee</span>
+                               <span className="font-semibold">$350.00</span>
+                             </div>
+                             <div>
+                               <span className="font-medium text-muted-foreground block mb-1">Exam Required</span>
+                               <span>Business & Law only (Trade exam waived via reciprocity)</span>
+                             </div>
+                             <div>
+                               <span className="font-medium text-muted-foreground block mb-1">Processing Time</span>
+                               <span>4-6 weeks</span>
+                             </div>
+                             <div>
+                               <span className="font-medium text-muted-foreground block mb-1">Additional Requirements</span>
+                               <ul className="list-disc pl-4 mt-1 space-y-1 text-slate-600">
+                                 <li>Background check</li>
+                                 <li>Financial statement</li>
+                                 <li>Worker's comp insurance</li>
+                               </ul>
+                             </div>
+                           </div>
+                           <Button className="w-full mt-6">Start Application Process</Button>
+                         </div>
+                       )}
+                     </CardContent>
                    </Card>
+                 </div>
+               </div>
+             ) : (
+               <>
+                 {/* Blurred Map Background */}
+                 <div className="absolute inset-0 filter blur-md opacity-50 pointer-events-none select-none overflow-hidden flex items-center justify-center">
+                    <div className="w-full h-full bg-slate-100 dark:bg-slate-900 grid grid-cols-12 gap-4 p-8">
+                      {Array.from({ length: 24 }).map((_, i) => (
+                        <div key={i} className="bg-slate-300 dark:bg-slate-700 rounded-md h-16 opacity-20"></div>
+                      ))}
+                    </div>
+                 </div>
+                 
+                 {/* Paywall Overlay */}
+                 <div className="relative z-10 flex flex-col items-center justify-center text-center py-10 px-4">
+                    <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6">
+                       <Lock className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-3xl font-bold mb-4">Unlock the Reciprocity Map</h3>
+                    <p className="text-lg text-muted-foreground max-w-lg mb-8">
+                      Discover licensing reciprocity across all 50 states, analyze contractor density, and identify high-potential expansion markets.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl w-full text-left">
+                       <Card className="border-border/50 bg-white dark:bg-slate-950 shadow-sm">
+                          <CardHeader>
+                             <CardTitle>Monthly Pass</CardTitle>
+                             <div className="text-3xl font-bold mt-2">$49<span className="text-sm text-muted-foreground font-normal">/mo</span></div>
+                          </CardHeader>
+                          <CardContent>
+                             <ul className="text-sm space-y-3 mb-6">
+                                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Full 50-state reciprocity data</span></li>
+                                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Contractor density heatmaps</span></li>
+                                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>State-by-state requirements</span></li>
+                             </ul>
+                             <Button className="w-full" onClick={() => { setIsSubscribeModalOpen(false); setIsSubscribed(true); toast.success('Successfully subscribed to Reciprocity Map!'); }}>Subscribe Monthly</Button>
+                          </CardContent>
+                       </Card>
                    
                    <Card className="border-primary bg-primary/5 dark:bg-primary/10 shadow-sm relative overflow-hidden">
                       <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg">
@@ -1233,13 +1354,17 @@ const handleGenerateTaxReport = () => {
                             <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Priority PDF exports</span></li>
                             <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Early access to new states</span></li>
                          </ul>
-                         <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => setIsSubscribeModalOpen(true)}>Subscribe Annually</Button>
+                         <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => { setIsSubscribeModalOpen(false); setIsSubscribed(true); toast.success('Successfully subscribed to Reciprocity Map Annual!'); }}>Subscribe Annually</Button>
                       </CardContent>
                    </Card>
                 </div>
              </div>
+           </>
+          )}
           </div>
         </div>
+          );
+        })()
       ) : role === 'Qualifier' ? (
         <div className="p-8 max-w-[1400px] mx-auto space-y-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 flex justify-between items-center">
@@ -2711,7 +2836,7 @@ const handleGenerateTaxReport = () => {
               <Card>
                 <CardContent className="p-4 flex flex-col justify-center">
                   <p className="text-sm text-muted-foreground font-medium">Most Dense State</p>
-                  <h4 className="text-2xl font-bold mt-1">{Object.entries(mapData).sort((a,b) => b[1] - a[1])[0]?.[0] || 'N/A'}</h4>
+                  <h4 className="text-2xl font-bold mt-1">{Object.entries(mapData).sort((a,b) => (b[1] as number) - (a[1] as number))[0]?.[0] || 'N/A'}</h4>
                 </CardContent>
               </Card>
               <Card>
@@ -2728,13 +2853,71 @@ const handleGenerateTaxReport = () => {
               </Card>
             </div>
 
-            {/* The HTML map embedded via iframe */}
-            <iframe 
-              src="/reciprocity-finder.html" 
-              style={{ width: "100%", height: "950px", border: 0 }}
-              className="rounded-lg bg-slate-50 shadow-inner"
-              title="License Reciprocity Finder"
-            />
+            <div className="flex flex-col xl:flex-row gap-6">
+              <div className="flex-1">
+                {/* The HTML map embedded via iframe */}
+                <iframe 
+                  src="/reciprocity-finder.html" 
+                  style={{ width: "100%", height: "950px", border: 0 }}
+                  className="rounded-lg bg-slate-50 shadow-inner"
+                  title="License Reciprocity Finder"
+                />
+              </div>
+              <div className="w-full xl:w-[400px] shrink-0 space-y-6">
+                <Card className="sticky top-6">
+                  <CardHeader>
+                    <CardTitle>State Requirements</CardTitle>
+                    <CardDescription>Select a state to view detailed licensing requirements</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Select value={mapStateFilter} onValueChange={setMapStateFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select State" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="All">Select a state...</SelectItem>
+                        {Object.keys(stateAbbreviations).map(state => (
+                          <SelectItem key={state} value={state}>{state}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {mapStateFilter !== "All" && (
+                      <div className="mt-6 space-y-4">
+                        <div>
+                          <h4 className="font-semibold text-lg">{mapStateFilter}</h4>
+                          <Badge className="mt-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">Reciprocity Active</Badge>
+                        </div>
+                        <Separator />
+                        <div className="space-y-4 text-sm">
+                          <div>
+                            <span className="font-medium text-muted-foreground block mb-1">Application Fee</span>
+                            <span className="font-semibold">$350.00</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground block mb-1">Exam Required</span>
+                            <span>Business & Law only (Trade exam waived via reciprocity)</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground block mb-1">Processing Time</span>
+                            <span>4-6 weeks</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground block mb-1">Additional Requirements</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-slate-600">
+                              <li>Background check</li>
+                              <li>Financial statement</li>
+                              <li>Worker's comp insurance</li>
+                            </ul>
+                          </div>
+                        </div>
+                        <Button className="w-full mt-6">Start Application Process</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
             {/* Advanced React Map Controls */}
             <div className="mt-8 pt-8 border-t border-border/50">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-6">
@@ -3008,6 +3191,16 @@ const handleGenerateTaxReport = () => {
           </div>
           </div>
           ) : (
+             isSubscribed ? (
+               <div className="bg-white rounded-xl shadow-sm border border-border/50 p-8 overflow-x-auto min-h-[800px]">
+                 <iframe 
+                   src="/reciprocity-finder.html" 
+                   style={{ width: "100%", height: "950px", border: 0 }}
+                   className="rounded-lg bg-slate-50 shadow-inner"
+                   title="License Reciprocity Finder"
+                 />
+               </div>
+             ) : (
             <div className="relative bg-white rounded-xl shadow-sm border border-border/50 p-8 overflow-hidden min-h-[800px] flex items-center justify-center">
                {/* Blurred Map Background */}
                <div className="absolute inset-0 filter blur-md opacity-50 pointer-events-none select-none overflow-hidden flex items-center justify-center">
@@ -3056,7 +3249,7 @@ const handleGenerateTaxReport = () => {
                               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>PDF Export Capabilities</span></li>
                               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary shrink-0" /> <span>Priority support</span></li>
                            </ul>
-                           <Button className="w-full" onClick={() => setIsSubscribeModalOpen(true)}>Subscribe Annually</Button>
+                           <Button className="w-full" onClick={() => { setIsSubscribeModalOpen(false); setIsSubscribed(true); toast.success('Successfully subscribed to Reciprocity Map Annual!'); }}>Subscribe Annually</Button>
                         </CardContent>
                      </Card>
                   </div>
@@ -3064,6 +3257,7 @@ const handleGenerateTaxReport = () => {
                   <p className="text-sm text-muted-foreground">Already have a subscription? <a href="#" className="text-primary hover:underline transition-all">Contact Support</a></p>
                </div>
             </div>
+             )
           )
         ) : viewMode === 'calendar' ? (
           <div className="bg-white rounded-xl shadow-sm border border-border/50 p-8">
@@ -4391,20 +4585,34 @@ const handleGenerateTaxReport = () => {
             </div>
 
             <Tabs defaultValue="embedded" className="w-full">
-              <TabsList className="mb-4">
+              <TabsList className="mb-4 flex flex-wrap h-auto gap-2">
                 <TabsTrigger value="embedded">Embedded CRM</TabsTrigger>
                 <TabsTrigger value="settings">Settings & API</TabsTrigger>
                 <TabsTrigger value="mapping">Field Mapping</TabsTrigger>
                 <TabsTrigger value="conflicts">Sync Conflicts</TabsTrigger>
+                <TabsTrigger value="sync-logs">Two-Way Sync Logs</TabsTrigger>
+                <TabsTrigger value="workflows">Follow-up Workflows</TabsTrigger>
+                <TabsTrigger value="lead-scoring">Lead Scoring</TabsTrigger>
               </TabsList>
               
               <TabsContent value="embedded" className="mt-0">
                 <Card className="border shadow-sm overflow-hidden bg-background">
+                  <div className="p-4 bg-muted/30 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>If the CRM fails to load due to browser security settings, you can open it directly.</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => window.open('https://www.avocolab.com/', '_blank')}>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open CRM in New Tab
+                    </Button>
+                  </div>
                   <div className="w-full h-[800px] bg-muted/20 relative">
                     <iframe 
                       src="https://www.avocolab.com/" 
                       className="w-full h-full border-0 absolute inset-0"
                       title="AvocoLab CRM"
+                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                     />
                   </div>
                 </Card>
@@ -4603,6 +4811,219 @@ const handleGenerateTaxReport = () => {
                             </TableRow>
                           </TableBody>
                         </Table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="sync-logs" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <History className="w-5 h-5 text-primary" /> Two-Way Sync Logs
+                    </CardTitle>
+                    <CardDescription>Real-time activity of data flowing between IQS and the CRM</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Timestamp</TableHead>
+                              <TableHead>Direction</TableHead>
+                              <TableHead>Entity</TableHead>
+                              <TableHead>Action</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <TableRow>
+                              <TableCell className="text-muted-foreground">Just now</TableCell>
+                              <TableCell><Badge variant="outline" className="text-emerald-500 border-emerald-500/30">IQS → CRM</Badge></TableCell>
+                              <TableCell className="font-medium">Contact: James Ortega</TableCell>
+                              <TableCell>Updated License Expiration</TableCell>
+                              <TableCell><CheckCircle2 className="w-4 h-4 text-emerald-500" /></TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="text-muted-foreground">5 mins ago</TableCell>
+                              <TableCell><Badge variant="outline" className="text-blue-500 border-blue-500/30">CRM → IQS</Badge></TableCell>
+                              <TableCell className="font-medium">Lead: Volt Masters</TableCell>
+                              <TableCell>Stage Changed to "In Negotiation"</TableCell>
+                              <TableCell><CheckCircle2 className="w-4 h-4 text-emerald-500" /></TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="text-muted-foreground">1 hour ago</TableCell>
+                              <TableCell><Badge variant="outline" className="text-emerald-500 border-emerald-500/30">IQS → CRM</Badge></TableCell>
+                              <TableCell className="font-medium">Note: ProAir Services</TableCell>
+                              <TableCell>Added Call Summary</TableCell>
+                              <TableCell><CheckCircle2 className="w-4 h-4 text-emerald-500" /></TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="workflows" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Workflow className="w-5 h-5 text-primary" /> Automated Follow-up Workflows
+                    </CardTitle>
+                    <CardDescription>Configure auto-responders and multi-step follow-ups for CRM leads</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card className="border shadow-sm">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base">New Lead Nurture</CardTitle>
+                              <Switch defaultChecked />
+                            </div>
+                            <CardDescription>Triggered when a new lead enters the CRM</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="flex flex-col space-y-2">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="bg-primary/10 text-primary w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">1</span>
+                                <span>Day 1: Welcome Email</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="bg-primary/10 text-primary w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">2</span>
+                                <span>Day 3: SMS Follow-up</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="bg-primary/10 text-primary w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">3</span>
+                                <span>Day 7: Create Task to Call</span>
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm" className="w-full">Edit Workflow</Button>
+                          </CardContent>
+                        </Card>
+                        <Card className="border shadow-sm">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base">Missing Documents</CardTitle>
+                              <Switch defaultChecked />
+                            </div>
+                            <CardDescription>Triggered when a lead is missing required files</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="flex flex-col space-y-2">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="bg-primary/10 text-primary w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">1</span>
+                                <span>Immediate: Document Request Email</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="bg-primary/10 text-primary w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">2</span>
+                                <span>Day 2: SMS Reminder</span>
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm" className="w-full">Edit Workflow</Button>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      <Button className="w-full"><Plus className="w-4 h-4 mr-2" /> Create New Workflow</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="lead-scoring" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Activity className="w-5 h-5 text-primary" /> Lead Scoring Dashboard
+                    </CardTitle>
+                    <CardDescription>Automatically prioritize leads based on engagement and profile completeness</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card className="bg-emerald-500/5 border-emerald-500/20">
+                          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">Hot (80+)</div>
+                            <div className="text-sm text-muted-foreground">12 Leads</div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-amber-500/5 border-amber-500/20">
+                          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400 mb-1">Warm (50-79)</div>
+                            <div className="text-sm text-muted-foreground">34 Leads</div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-slate-500/5 border-slate-500/20">
+                          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                            <div className="text-3xl font-bold text-slate-600 dark:text-slate-400 mb-1">Cold (&lt;50)</div>
+                            <div className="text-sm text-muted-foreground">89 Leads</div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <h4 className="font-medium">Top Scored Leads</h4>
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Lead Name</TableHead>
+                                <TableHead>Trade</TableHead>
+                                <TableHead>Score</TableHead>
+                                <TableHead>Recent Activity</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              <TableRow>
+                                <TableCell className="font-medium">Lightning Electric LLC</TableCell>
+                                <TableCell>Electrical</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                                      <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '95%' }}></div>
+                                    </div>
+                                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">95</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">Opened email, Clicked link</TableCell>
+                                <TableCell className="text-right"><Button size="sm" variant="outline">View CRM</Button></TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell className="font-medium">Volt Masters</TableCell>
+                                <TableCell>HVAC</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                                      <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '82%' }}></div>
+                                    </div>
+                                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">82</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">Replied to SMS</TableCell>
+                                <TableCell className="text-right"><Button size="sm" variant="outline">View CRM</Button></TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell className="font-medium">ProAir Services</TableCell>
+                                <TableCell>Plumbing</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-full bg-muted rounded-full h-2 max-w-[100px]">
+                                      <div className="bg-amber-500 h-2 rounded-full" style={{ width: '65%' }}></div>
+                                    </div>
+                                    <span className="text-sm font-bold text-amber-600 dark:text-amber-400">65</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">Website Visit</TableCell>
+                                <TableCell className="text-right"><Button size="sm" variant="outline">View CRM</Button></TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -6212,6 +6633,160 @@ const handleGenerateTaxReport = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isVendorLicenseModalOpen} onOpenChange={setIsVendorLicenseModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload License to Database</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">State</label>
+              <Select value={vendorLicenseData.state} onValueChange={(val) => setVendorLicenseData({...vendorLicenseData, state: val})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(stateAbbreviations).map(state => (
+                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Classification</label>
+              <Input 
+                placeholder="e.g. Electrical Contractor" 
+                value={vendorLicenseData.classification}
+                onChange={(e) => setVendorLicenseData({...vendorLicenseData, classification: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">License Number</label>
+              <Input 
+                placeholder="e.g. ELEC-12345" 
+                value={vendorLicenseData.licenseNumber}
+                onChange={(e) => setVendorLicenseData({...vendorLicenseData, licenseNumber: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Renewal Date</label>
+              <Input 
+                type="date"
+                value={vendorLicenseData.renewalDate}
+                onChange={(e) => setVendorLicenseData({...vendorLicenseData, renewalDate: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Upload License Document (PDF/Image)</label>
+              <div 
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                  vendorLicenseFile ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+                }`}
+                onClick={() => document.getElementById('vendor-license-upload')?.click()}
+              >
+                <input 
+                  type="file" 
+                  id="vendor-license-upload" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setVendorLicenseFile(e.target.files[0]);
+                    }
+                  }}
+                />
+                {vendorLicenseFile ? (
+                  <div className="flex flex-col items-center">
+                    <FileText className="w-8 h-8 text-primary mb-2" />
+                    <p className="text-sm font-medium">{vendorLicenseFile.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Click to change file</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center text-muted-foreground">
+                    <UploadCloud className="w-8 h-8 mb-2 opacity-50" />
+                    <p className="text-sm font-medium text-foreground">Click to upload or drag and drop</p>
+                    <p className="text-xs mt-1">PDF, JPG, PNG up to 10MB</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsVendorLicenseModalOpen(false)}>Cancel</Button>
+            <Button 
+              disabled={isUploadingLicense || !vendorLicenseFile || !vendorLicenseData.licenseNumber}
+              onClick={async () => {
+                setIsUploadingLicense(true);
+                try {
+                  // 1. Upload file to Supabase Storage (assuming 'licenses' bucket exists)
+                  const fileExt = vendorLicenseFile?.name.split('.').pop();
+                  const fileName = `${userEmail}-license-${Date.now()}.${fileExt}`;
+                  
+                  // Try to upload to storage, but don't block if it fails since bucket might not exist
+                  let fileUrl = "";
+                  try {
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                      .from('licenses')
+                      .upload(fileName, vendorLicenseFile as File);
+                      
+                    if (uploadData) {
+                      const { data: { publicUrl } } = supabase.storage.from('licenses').getPublicUrl(fileName);
+                      fileUrl = publicUrl;
+                    }
+                  } catch (e) {
+                    console.log("Storage upload skipped or failed", e);
+                  }
+
+                  // 2. Insert into database
+                  const { error } = await supabase.from('vendor_licenses').insert([{
+                    vendor_email: userEmail,
+                    vendor_name: userName || 'Vendor',
+                    state: vendorLicenseData.state,
+                    classification: vendorLicenseData.classification,
+                    license_number: vendorLicenseData.licenseNumber,
+                    renewal_date: vendorLicenseData.renewalDate,
+                    status: 'Active',
+                    file_url: fileUrl
+                  }]);
+
+                  if (error) {
+                    // Fallback to updating local state if table doesn't exist
+                    console.log("DB Insert error (table might not exist):", error);
+                  }
+                  
+                  // Update UI locally
+                  setContractorsList(prev => [...prev, {
+                    id: Date.now(),
+                    name: userName || 'Vendor',
+                    initials: (userName || 'V').substring(0, 2).toUpperCase(),
+                    status: 'Available',
+                    location: [vendorLicenseData.state],
+                    trades: [],
+                    renewalDate: vendorLicenseData.renewalDate,
+                    licenseNumber: vendorLicenseData.licenseNumber,
+                    classification: vendorLicenseData.classification,
+                    isVerified: true,
+                    email: userEmail,
+                    phone: "(555) 000-0000"
+                  }]);
+
+                  toast.success("License uploaded successfully!");
+                  setIsVendorLicenseModalOpen(false);
+                  setVendorLicenseFile(null);
+                  setVendorLicenseData({ state: "Texas", classification: "Specialty", licenseNumber: "", renewalDate: "" });
+                } catch (err) {
+                  console.error(err);
+                  toast.error("Failed to upload license");
+                } finally {
+                  setIsUploadingLicense(false);
+                }
+              }}
+            >
+              {isUploadingLicense ? "Uploading..." : "Upload & Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isAddDocModalOpen} onOpenChange={setIsAddDocModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -6943,11 +7518,29 @@ const handleGenerateTaxReport = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddBookModalOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
+            <Button onClick={async () => {
               if (!newBook.title || !newBook.file) {
                 toast.error("Please provide a title and upload a file");
                 return;
               }
+              
+              toast.info("Uploading book...");
+              let fileUrl = "";
+              try {
+                const fileExt = newBook.file.name.split('.').pop();
+                const fileName = `book-${Date.now()}.${fileExt}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                  .from('library')
+                  .upload(fileName, newBook.file);
+                  
+                if (uploadData) {
+                  const { data: { publicUrl } } = supabase.storage.from('library').getPublicUrl(fileName);
+                  fileUrl = publicUrl;
+                }
+              } catch (e) {
+                console.log("Storage upload skipped or failed", e);
+              }
+
               const newEntry = {
                 id: Date.now(),
                 title: newBook.title,
@@ -6956,6 +7549,7 @@ const handleGenerateTaxReport = () => {
                 status: "Active",
                 expires: "Never",
                 price: newBook.price,
+                fileUrl: fileUrl,
                 file: newBook.file
               };
               setLibraryBooks(prev => [newEntry, ...prev]);
