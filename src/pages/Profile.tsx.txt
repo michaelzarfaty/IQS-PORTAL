@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,35 +7,130 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRole } from "@/lib/RoleContext";
 import { toast } from "sonner";
-import { Camera, Save, User, Lock, Bell } from "lucide-react";
+import { Camera, Save, User, Lock, Bell, History, Book } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/lib/supabase";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 const Profile = () => {
-  const { role } = useRole();
+  const { role, userEmail, userName, setUserName } = useRole();
   const [isSaving, setIsSaving] = useState(false);
   const [profileData, setProfileData] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john.doe@example.com",
-    phone: "(555) 123-4567",
-    company: "IQS Inc",
+    firstName: userName?.split(" ")[0] || "",
+    lastName: userName?.split(" ").slice(1).join(" ") || "",
+    email: userEmail || "",
+    phone: "",
+    company: "",
+    avatarUrl: "",
   });
+  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  const handleSaveProfile = () => {
+  useEffect(() => {
+    // Optionally fetch more profile data from profiles table
+    const fetchProfile = async () => {
+      if (!userEmail) return;
+      const { data } = await supabase.from('profiles').select('*').eq('email', userEmail).single();
+      if (data) {
+        setProfileData({
+          firstName: data.full_name?.split(" ")[0] || "",
+          lastName: data.full_name?.split(" ").slice(1).join(" ") || "",
+          email: data.email || userEmail,
+          phone: data.phone || "",
+          company: data.company || "",
+          avatarUrl: data.avatar_url || "",
+        });
+      }
+    };
+    fetchProfile();
+  }, [userEmail]);
+
+  const handleSaveProfile = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const fullName = `${profileData.firstName} ${profileData.lastName}`.trim();
+      
+      // Update in profiles table
+      const { error } = await supabase.from('profiles').update({
+        full_name: fullName,
+        phone: profileData.phone,
+        company: profileData.company,
+        avatar_url: profileData.avatarUrl
+      }).eq('email', userEmail);
+      
+      if (error) throw error;
+      
+      setUserName(fullName);
       toast.success("Profile updated successfully!");
-    }, 800);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update profile.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleUpdatePassword = () => {
+  const handleUpdatePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+    if (passwords.new.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwords.new
+      });
+      
+      if (error) throw error;
+      
       toast.success("Password updated successfully!");
-    }, 800);
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update password.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploadingAvatar(true);
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${userEmail}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      setProfileData({ ...profileData, avatarUrl: data.publicUrl });
+      
+      // Immediately update profile
+      if (userEmail) {
+        await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('email', userEmail);
+      }
+      
+      toast.success("Profile picture updated!");
+    } catch (error) {
+      toast.error("Error uploading image");
+      console.error(error);
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   return (
@@ -47,10 +142,11 @@ const Profile = () => {
         </div>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="mb-6">
+          <TabsList className="mb-6 overflow-x-auto flex-nowrap w-full justify-start md:w-auto h-auto p-1">
             <TabsTrigger value="general" className="flex items-center gap-2"><User className="w-4 h-4" /> General</TabsTrigger>
             <TabsTrigger value="security" className="flex items-center gap-2"><Lock className="w-4 h-4" /> Security</TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell className="w-4 h-4" /> Notifications</TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2"><History className="w-4 h-4" /> Rental History</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-6">
@@ -62,13 +158,24 @@ const Profile = () => {
               <CardContent className="space-y-6">
                 <div className="flex items-center gap-6">
                   <Avatar className="w-24 h-24 border-2 border-border">
-                    <AvatarImage src="" />
-                    <AvatarFallback className="text-2xl bg-primary/10 text-primary">JD</AvatarFallback>
+                    <AvatarImage src={profileData.avatarUrl} />
+                    <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+                      {profileData.firstName?.charAt(0)}{profileData.lastName?.charAt(0)}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="space-y-2">
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Camera className="w-4 h-4" /> Change Photo
-                    </Button>
+                    <div className="relative">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleAvatarUpload} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        disabled={uploadingAvatar}
+                      />
+                      <Button variant="outline" className="flex items-center gap-2" disabled={uploadingAvatar}>
+                        <Camera className="w-4 h-4" /> {uploadingAvatar ? "Uploading..." : "Change Photo"}
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground">JPG, GIF or PNG. Max size of 2MB.</p>
                   </div>
                 </div>
@@ -143,16 +250,16 @@ const Profile = () => {
               </CardHeader>
               <CardContent className="space-y-4 max-w-md">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input id="currentPassword" type="password" />
+                  <Label htmlFor="currentPassword">Current Password (optional)</Label>
+                  <Input id="currentPassword" type="password" value={passwords.current} onChange={(e) => setPasswords({...passwords, current: e.target.value})} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="newPassword">New Password</Label>
-                  <Input id="newPassword" type="password" />
+                  <Input id="newPassword" type="password" value={passwords.new} onChange={(e) => setPasswords({...passwords, new: e.target.value})} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <Input id="confirmPassword" type="password" />
+                  <Input id="confirmPassword" type="password" value={passwords.confirm} onChange={(e) => setPasswords({...passwords, confirm: e.target.value})} />
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-6">
@@ -182,8 +289,8 @@ const Profile = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>License Expirations</Label>
-                        <p className="text-sm text-muted-foreground">Receive alerts for upcoming license expirations.</p>
+                        <Label>Automated License Renewals</Label>
+                        <p className="text-sm text-muted-foreground">Receive automated email alerts 60 and 30 days before a license expires.</p>
                       </div>
                       <Switch defaultChecked />
                     </div>
@@ -200,6 +307,49 @@ const Profile = () => {
             </Card>
           </TabsContent>
         </Tabs>
+          <TabsContent value="history" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Library Rental History</CardTitle>
+                <CardDescription>Track the books and materials you have rented.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Resource</TableHead>
+                      <TableHead>Rented On</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Credits</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium flex items-center gap-2">
+                        <Book className="w-4 h-4 text-slate-400" />
+                        Contractor Law & Business 2024
+                      </TableCell>
+                      <TableCell>Oct 20, 2024</TableCell>
+                      <TableCell>Nov 20, 2024</TableCell>
+                      <TableCell>5</TableCell>
+                      <TableCell><Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Active</Badge></TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium flex items-center gap-2">
+                        <Book className="w-4 h-4 text-slate-400" />
+                        Building Codes Guide
+                      </TableCell>
+                      <TableCell>Sep 15, 2024</TableCell>
+                      <TableCell>Oct 15, 2024</TableCell>
+                      <TableCell>3</TableCell>
+                      <TableCell><Badge variant="outline" className="bg-slate-50 text-slate-500">Expired</Badge></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
       </div>
     </Layout>
   );

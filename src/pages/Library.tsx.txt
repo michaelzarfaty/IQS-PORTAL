@@ -1,25 +1,44 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Book, CreditCard, Download, Upload } from "lucide-react";
+import { Search, Book, CreditCard, Download, Upload, TrendingUp, Users, BookOpen, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "@/lib/RoleContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Library() {
   const { role } = useRole();
   const [credits, setCredits] = useState(10);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [authorFilter, setAuthorFilter] = useState("all");
   const [books, setBooks] = useState<any[]>([
-    { id: 1, title: "Contractor Law & Business 2024", author: "NASCLA", credits: 5, cover: "https://vibe.filesafe.space/1783350442961167380/attachments/e73efa72-5bce-4447-8a3d-493aafd0ecec.png" },
-    { id: 2, title: "Building Codes Guide", author: "ICC", credits: 3, cover: "https://vibe.filesafe.space/1783350442961167380/attachments/e73efa72-5bce-4447-8a3d-493aafd0ecec.png" },
+    { id: 1, title: "Contractor Law & Business 2024", author: "NASCLA", category: "Law & Business", credits: 5, cover: "https://vibe.filesafe.space/1783350442961167380/attachments/e73efa72-5bce-4447-8a3d-493aafd0ecec.png", rentCount: 142 },
+    { id: 2, title: "Building Codes Guide", author: "ICC", category: "Building Codes", credits: 3, cover: "https://vibe.filesafe.space/1783350442961167380/attachments/e73efa72-5bce-4447-8a3d-493aafd0ecec.png", rentCount: 89 },
+    { id: 3, title: "Electrical Safety Standards", author: "NFPA", category: "Safety", credits: 4, cover: "https://vibe.filesafe.space/1783350442961167380/attachments/e73efa72-5bce-4447-8a3d-493aafd0ecec.png", rentCount: 110 },
+    { id: 4, title: "Plumbing Basics", author: "ICC", category: "Plumbing", credits: 2, cover: "https://vibe.filesafe.space/1783350442961167380/attachments/e73efa72-5bce-4447-8a3d-493aafd0ecec.png", rentCount: 65 },
   ]);
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+
+  const categories = useMemo(() => Array.from(new Set(books.map(b => b.category))), [books]);
+  const authors = useMemo(() => Array.from(new Set(books.map(b => b.author))), [books]);
+
+  const filteredBooks = useMemo(() => {
+    return books.filter(book => {
+      const matchesSearch = book.title.toLowerCase().includes(search.toLowerCase()) || book.author.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = categoryFilter === "all" || book.category === categoryFilter;
+      const matchesAuthor = authorFilter === "all" || book.author === authorFilter;
+      return matchesSearch && matchesCategory && matchesAuthor;
+    });
+  }, [books, search, categoryFilter, authorFilter]);
 
   const handleRent = (book: any) => {
     if (credits >= book.credits) {
@@ -31,16 +50,25 @@ export default function Library() {
     }
   };
 
-  const handleBuyCredits = () => {
-    setCredits(prev => prev + 10);
-    setIsBuyModalOpen(false);
-    toast.success("Successfully purchased 10 credits!");
+  const handleBuyCredits = (amount: number) => {
+    toast.info("Redirecting to Stripe checkout...");
+    setTimeout(() => {
+      setCredits(prev => prev + amount);
+      setIsBuyModalOpen(false);
+      toast.success(`Payment successful! ${amount} credits added to your account.`);
+    }, 1500);
   };
 
   const handleUploadBook = (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploadModalOpen(false);
     toast.success("Book uploaded successfully! (Mock)");
+  };
+
+  const handleBulkUpload = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsBulkUploadOpen(false);
+    toast.success("Bulk upload processed successfully! (Mock)");
   };
 
   return (
@@ -68,71 +96,144 @@ export default function Library() {
             </Card>
             
             {['Super Admin', 'Admin', 'Employee'].includes(role) && (
-              <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
-                <DialogTrigger asChild>
-                  <Button className="h-full py-6">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Book
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Upload New Book</DialogTitle>
-                    <DialogDescription>Add a new resource to the library.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleUploadBook} className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Book Title</Label>
-                      <Input placeholder="e.g. NASCLA 2024 Edition" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Credit Cost to Rent</Label>
-                      <Input type="number" min="0" placeholder="5" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>PDF File</Label>
-                      <Input type="file" accept=".pdf" required />
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit">Upload Resource</Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              <>
+                <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="h-full py-6">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Bulk Upload (CSV)
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Bulk Upload Books</DialogTitle>
+                      <DialogDescription>Upload a CSV file containing book details.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleBulkUpload} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>CSV Template</Label>
+                        <Button type="button" variant="link" className="px-0 h-auto">Download Template</Button>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>CSV File</Label>
+                        <Input type="file" accept=".csv" required />
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit">Process Upload</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="h-full py-6">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Book
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Upload New Book</DialogTitle>
+                      <DialogDescription>Add a new resource to the library.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleUploadBook} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Book Title</Label>
+                        <Input placeholder="e.g. NASCLA 2024 Edition" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Credit Cost to Rent</Label>
+                        <Input type="number" min="0" placeholder="5" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>PDF File</Label>
+                        <Input type="file" accept=".pdf" required />
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit">Upload Resource</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </>
             )}
           </div>
         </div>
 
-        <div className="relative mb-8">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <Input 
-            className="pl-10 h-12 text-lg bg-white" 
-            placeholder="Search books, guides, and materials..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <Input 
+              className="pl-10 h-12 text-lg bg-white" 
+              placeholder="Search books, guides, and materials..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full md:w-[200px] h-12 bg-white">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map(c => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={authorFilter} onValueChange={setAuthorFilter}>
+            <SelectTrigger className="w-full md:w-[200px] h-12 bg-white">
+              <SelectValue placeholder="Author" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Authors</SelectItem>
+              {authors.map(a => (
+                <SelectItem key={a} value={a}>{a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {books.map(book => (
-            <Card key={book.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <div className="aspect-[3/2] bg-slate-100 flex items-center justify-center border-b p-6">
-                <Book className="w-16 h-16 text-slate-300" />
-              </div>
-              <CardHeader>
-                <CardTitle className="line-clamp-1">{book.title}</CardTitle>
-                <CardDescription>{book.author}</CardDescription>
-              </CardHeader>
-              <CardFooter className="flex items-center justify-between bg-slate-50 border-t p-4">
-                <div className="font-medium text-primary">
-                  {book.credits} Credits
+          {filteredBooks.length === 0 ? (
+            <div className="col-span-full py-12 text-center border-2 border-dashed rounded-lg bg-slate-50 text-slate-500">
+              <Book className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+              <p className="text-lg font-medium">No books found</p>
+              <p className="text-sm">Try adjusting your search or filters</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => {
+                  setSearch("");
+                  setCategoryFilter("all");
+                  setAuthorFilter("all");
+                }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          ) : (
+            filteredBooks.map(book => (
+              <Card key={book.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <div className="aspect-[3/2] bg-slate-100 flex items-center justify-center border-b p-6">
+                  <Book className="w-16 h-16 text-slate-300" />
                 </div>
-                <Button onClick={() => handleRent(book)}>
-                  Rent Book
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                <CardHeader>
+                  <CardTitle className="line-clamp-1">{book.title}</CardTitle>
+                  <CardDescription>{book.author} • {book.category}</CardDescription>
+                </CardHeader>
+                <CardFooter className="flex items-center justify-between bg-slate-50 border-t p-4">
+                  <div className="font-medium text-primary">
+                    {book.credits} Credits
+                  </div>
+                  <Button onClick={() => handleRent(book)}>
+                    Rent Book
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))
+          )}
         </div>
 
         <Dialog open={isBuyModalOpen} onOpenChange={setIsBuyModalOpen}>
@@ -142,7 +243,7 @@ export default function Library() {
               <DialogDescription>Credits are used to rent premium study materials and reference books.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <Card className="border-primary cursor-pointer hover:bg-primary/5 transition-colors" onClick={handleBuyCredits}>
+              <Card className="border-primary cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => handleBuyCredits(10)}>
                 <CardContent className="p-6 flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-lg">10 Credits</h4>
@@ -151,7 +252,7 @@ export default function Library() {
                   <div className="text-xl font-bold">$10.00</div>
                 </CardContent>
               </Card>
-              <Card className="cursor-pointer hover:bg-slate-50 transition-colors" onClick={handleBuyCredits}>
+              <Card className="cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleBuyCredits(50)}>
                 <CardContent className="p-6 flex items-center justify-between">
                   <div>
                     <h4 className="font-bold text-lg">50 Credits</h4>

@@ -3,21 +3,36 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, Download, Send, CreditCard, Upload } from "lucide-react";
+import { Plus, FileText, Download, Send, CreditCard, Upload, DollarSign, Activity, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRole } from "@/lib/RoleContext";
+import { Trash2 } from "lucide-react";
 
 const defaultFees = [
-  { id: 1, name: "IQS Application Fee", type: "Main Fee", amount: 1500.00, description: "Standard IQS processing fee" },
+  { id: 1, name: "TLS Application Fee", type: "Main Fee", amount: 1500.00, description: "Standard TLS processing fee" },
   { id: 2, name: "SOS Fee", type: "State Fee", amount: 0.00, description: "Secretary of State Fee (Varies by State)" },
 ];
 
 const Invoicing = () => {
+  const { role } = useRole();
   const [csvData, setCsvData] = useState("");
   const [fees, setFees] = useState(defaultFees);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvData(text);
+    };
+    reader.readAsText(file);
+  };
 
   const handleParseCSV = () => {
     if (!csvData.trim()) return;
@@ -71,6 +86,9 @@ const Invoicing = () => {
             <TabsTrigger value="pricing">Standard Pricing</TabsTrigger>
             <TabsTrigger value="states">State-by-State Fees</TabsTrigger>
             <TabsTrigger value="invoices">Invoices & Payments</TabsTrigger>
+            {['Super Admin', 'Admin'].includes(role) && (
+              <TabsTrigger value="analytics">Financial Analytics</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="pricing" className="space-y-6">
@@ -78,9 +96,13 @@ const Invoicing = () => {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Standard Pricing Schedule</CardTitle>
-                  <CardDescription>All CLP branding has been updated to IQS.</CardDescription>
+                  <CardDescription>TLS (The License Squad) standard fee configuration.</CardDescription>
                 </div>
-                <Dialog>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setFees([])} className="text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" /> Clear All
+                  </Button>
+                  <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline"><Upload className="w-4 h-4 mr-2" /> Import CSV/Excel</Button>
                   </DialogTrigger>
@@ -88,18 +110,40 @@ const Invoicing = () => {
                     <DialogHeader>
                       <DialogTitle>Import Pricing Data</DialogTitle>
                       <DialogDescription>
-                        Paste your Excel or CSV data directly into the box below.
+                        Upload a CSV file or paste your Excel/CSV data directly below.
                       </DialogDescription>
                     </DialogHeader>
-                    <Textarea 
-                      placeholder="Paste rows here (Name, Category, Amount, Description)..."
-                      className="min-h-[200px]"
-                      value={csvData}
-                      onChange={(e) => setCsvData(e.target.value)}
-                    />
-                    <Button onClick={handleParseCSV} className="w-full mt-4">Import Data</Button>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Upload CSV File</label>
+                        <input 
+                          type="file" 
+                          accept=".csv,.txt"
+                          onChange={handleFileUpload}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-background px-2 text-muted-foreground">
+                            Or Paste Data
+                          </span>
+                        </div>
+                      </div>
+                      <Textarea 
+                        placeholder="Paste rows here (Name, Category, Amount, Description)..."
+                        className="min-h-[150px]"
+                        value={csvData}
+                        onChange={(e) => setCsvData(e.target.value)}
+                      />
+                      <Button onClick={handleParseCSV} className="w-full">Import Data</Button>
+                    </div>
                   </DialogContent>
                 </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -109,6 +153,7 @@ const Invoicing = () => {
                       <TableHead>Category</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -123,6 +168,11 @@ const Invoicing = () => {
                         <TableCell className="text-muted-foreground">{fee.description}</TableCell>
                         <TableCell className="text-right font-medium">
                           ${fee.amount.toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={() => setFees(fees.filter(f => f.id !== fee.id))} className="text-muted-foreground hover:text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -210,6 +260,163 @@ const Invoicing = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {['Super Admin', 'Admin'].includes(role) && (
+            <TabsContent value="analytics" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">$45,231.89</div>
+                        <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+                        <div className="mt-4 text-xs font-medium text-primary flex items-center">
+                          View Breakdown <TrendingUp className="ml-1 w-3 h-3" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle>Revenue Breakdown</DialogTitle>
+                      <DialogDescription>Detailed view of revenue sources over the last 30 days.</DialogDescription>
+                    </DialogHeader>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell>Oct 24, 2024</TableCell>
+                          <TableCell>Vendor A (INV-2024-001)</TableCell>
+                          <TableCell>Main Application Fee</TableCell>
+                          <TableCell className="text-right font-medium text-green-600">+$1,500.00</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell>Oct 22, 2024</TableCell>
+                          <TableCell>Vendor C (INV-2024-008)</TableCell>
+                          <TableCell>Expedited Processing</TableCell>
+                          <TableCell className="text-right font-medium text-green-600">+$500.00</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell>Oct 20, 2024</TableCell>
+                          <TableCell>Vendor F (INV-2024-012)</TableCell>
+                          <TableCell>State SOS Fee (TX)</TableCell>
+                          <TableCell className="text-right font-medium text-green-600">+$115.00</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Outstanding Invoices</CardTitle>
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">$12,450.00</div>
+                        <p className="text-xs text-muted-foreground">8 invoices pending</p>
+                        <div className="mt-4 text-xs font-medium text-primary flex items-center">
+                          View Pending <TrendingUp className="ml-1 w-3 h-3" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle>Outstanding Invoices</DialogTitle>
+                      <DialogDescription>List of all currently unpaid invoices.</DialogDescription>
+                    </DialogHeader>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Invoice</TableHead>
+                          <TableHead>Vendor</TableHead>
+                          <TableHead>Due Date</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell className="font-medium">INV-2024-002</TableCell>
+                          <TableCell>Vendor B</TableCell>
+                          <TableCell className="text-red-500">Overdue (Oct 15)</TableCell>
+                          <TableCell className="text-right font-medium">$1,615.00</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-medium">INV-2024-015</TableCell>
+                          <TableCell>Vendor D</TableCell>
+                          <TableCell>Oct 30, 2024</TableCell>
+                          <TableCell className="text-right font-medium">$3,000.00</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </DialogContent>
+                </Dialog>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Average Processing Fee</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">$1,550.00</div>
+                    <p className="text-xs text-muted-foreground">+4.5% from last month</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue by Category</CardTitle>
+                  <CardDescription>Breakdown of fees collected this year</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center">
+                      <div className="w-1/3 font-medium">Main Application Fees</div>
+                      <div className="w-2/3">
+                        <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                          <div className="bg-primary h-full" style={{ width: '65%' }}></div>
+                        </div>
+                      </div>
+                      <div className="w-24 text-right text-sm font-medium">$29,400</div>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-1/3 font-medium">State SOS Fees</div>
+                      <div className="w-2/3">
+                        <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                          <div className="bg-blue-500 h-full" style={{ width: '25%' }}></div>
+                        </div>
+                      </div>
+                      <div className="w-24 text-right text-sm font-medium">$11,300</div>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-1/3 font-medium">Expedited Processing</div>
+                      <div className="w-2/3">
+                        <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                          <div className="bg-amber-500 h-full" style={{ width: '10%' }}></div>
+                        </div>
+                      </div>
+                      <div className="w-24 text-right text-sm font-medium">$4,531</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </Layout>
