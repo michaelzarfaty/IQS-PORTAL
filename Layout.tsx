@@ -262,6 +262,13 @@ export const Layout = ({ children }: { children: ReactNode }) => {
               isActive={location.pathname === "/" && new URLSearchParams(location.search).get("view") === "finance"}
               allowedRoles={[...INTERNAL_ROLES]}
             />
+            <SidebarItem 
+              icon={<Receipt className="w-4 h-4" />} 
+              label="3rd Party Invoicing" 
+              href="/invoicing" 
+              isActive={location.pathname === "/invoicing"}
+              allowedRoles={[...INTERNAL_ROLES, 'Vendor', 'Client']}
+            />
           </SidebarGroup>
 
           <SidebarGroup title="RETENTION" allowedRoles={[...INTERNAL_ROLES]}>
