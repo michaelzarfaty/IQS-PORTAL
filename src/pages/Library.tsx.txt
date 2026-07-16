@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Book, CreditCard, Download, Upload, TrendingUp, Users, BookOpen, Filter } from "lucide-react";
+import { Search, Book, CreditCard, Download, Upload, TrendingUp, Users, BookOpen, Filter, ShoppingCart, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "@/lib/RoleContext";
@@ -27,6 +27,9 @@ export default function Library() {
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [cart, setCart] = useState<any[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [previewBook, setPreviewBook] = useState<any | null>(null);
 
   const categories = useMemo(() => Array.from(new Set(books.map(b => b.category))), [books]);
   const authors = useMemo(() => Array.from(new Set(books.map(b => b.author))), [books]);
@@ -40,23 +43,48 @@ export default function Library() {
     });
   }, [books, search, categoryFilter, authorFilter]);
 
-  const handleRent = (book: any) => {
-    if (credits >= book.credits) {
-      setCredits(prev => prev - book.credits);
-      toast.success(`Successfully rented ${book.title}!`);
+  const handleAddToCart = (book: any) => {
+    if (cart.find(b => b.id === book.id)) {
+      toast.info(`${book.title} is already in your cart.`);
+      return;
+    }
+    setCart([...cart, book]);
+    toast.success(`Added ${book.title} to cart!`);
+  };
+
+  const handleRemoveFromCart = (bookId: number) => {
+    setCart(cart.filter(b => b.id !== bookId));
+  };
+
+  const handleCheckout = () => {
+    const totalCredits = cart.reduce((sum, book) => sum + book.credits, 0);
+    if (credits >= totalCredits) {
+      setCredits(prev => prev - totalCredits);
+      setCart([]);
+      setIsCartOpen(false);
+      toast.success(`Successfully rented ${cart.length} book(s)!`);
     } else {
       toast.error("Not enough credits. Please purchase more.");
       setIsBuyModalOpen(true);
     }
   };
 
+  const [selectedCreditAmount, setSelectedCreditAmount] = useState<number | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
   const handleBuyCredits = (amount: number) => {
-    toast.info("Redirecting to Stripe checkout...");
-    setTimeout(() => {
-      setCredits(prev => prev + amount);
-      setIsBuyModalOpen(false);
-      toast.success(`Payment successful! ${amount} credits added to your account.`);
-    }, 1500);
+    setSelectedCreditAmount(amount);
+    setIsBuyModalOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
+  const processPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCheckoutOpen(false);
+    if (selectedCreditAmount) {
+      setCredits(prev => prev + selectedCreditAmount);
+      toast.success(`Payment successful! ${selectedCreditAmount} credits added to your account.`);
+    }
   };
 
   const handleUploadBook = (e: React.FormEvent) => {
@@ -91,6 +119,15 @@ export default function Library() {
                 <Button onClick={() => setIsBuyModalOpen(true)} variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
                   <CreditCard className="w-4 h-4 mr-2" />
                   Buy Credits
+                </Button>
+                <Button onClick={() => setIsCartOpen(true)} variant="outline" className="relative ml-2">
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Cart
+                  {cart.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                      {cart.length}
+                    </span>
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -227,9 +264,14 @@ export default function Library() {
                   <div className="font-medium text-primary">
                     {book.credits} Credits
                   </div>
-                  <Button onClick={() => handleRent(book)}>
-                    Rent Book
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setPreviewBook(book)}>
+                      <Eye className="w-4 h-4 mr-2" /> Preview
+                    </Button>
+                    <Button size="sm" onClick={() => handleAddToCart(book)}>
+                      Add to Cart
+                    </Button>
+                  </div>
                 </CardFooter>
               </Card>
             ))
@@ -262,6 +304,110 @@ export default function Library() {
                 </CardContent>
               </Card>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Mock Stripe Checkout Dialog */}
+        <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Complete Payment</DialogTitle>
+              <DialogDescription>
+                You are purchasing {selectedCreditAmount} credits. This is currently running in test mode.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={processPayment} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name on Card</Label>
+                <Input id="name" placeholder="John Doe" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="card">Card Number</Label>
+                <Input id="card" placeholder="4242 4242 4242 4242" required maxLength={19} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="expiry">Expiry (MM/YY)</Label>
+                  <Input id="expiry" placeholder="12/25" required maxLength={5} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cvc">CVC</Label>
+                  <Input id="cvc" placeholder="123" required maxLength={4} />
+                </div>
+              </div>
+              <DialogFooter className="pt-4">
+                <Button type="submit" className="w-full">
+                  Pay ${selectedCreditAmount === 10 ? '10.00' : '40.00'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cart Dialog */}
+        <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Your Shopping Cart</DialogTitle>
+              <DialogDescription>Review your items before renting.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              {cart.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">Your cart is empty.</p>
+              ) : (
+                cart.map(item => (
+                  <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Book className="w-8 h-8 text-slate-300" />
+                      <div>
+                        <p className="font-medium text-sm">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">{item.credits} Credits</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleRemoveFromCart(item.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+            <DialogFooter className="flex items-center justify-between border-t pt-4 sm:justify-between">
+              <div className="font-medium">
+                Total: <span className="text-primary">{cart.reduce((sum, book) => sum + book.credits, 0)} Credits</span>
+              </div>
+              <Button onClick={handleCheckout} disabled={cart.length === 0}>
+                Checkout
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Preview Dialog */}
+        <Dialog open={!!previewBook} onOpenChange={(open) => !open && setPreviewBook(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{previewBook?.title} - Preview</DialogTitle>
+              <DialogDescription>Chapter 1 Excerpt</DialogDescription>
+            </DialogHeader>
+            <div className="bg-slate-50 p-8 rounded-md border min-h-[400px] font-serif overflow-y-auto relative">
+              <h2 className="text-2xl font-bold mb-4">Chapter 1: Introduction</h2>
+              <p className="mb-4 text-slate-700 leading-relaxed">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+              </p>
+              <p className="mb-4 text-slate-700 leading-relaxed">
+                Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+              </p>
+              <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-slate-50 to-transparent pointer-events-none flex items-end justify-center pb-6">
+                <span className="bg-white/80 backdrop-blur px-4 py-2 rounded-full text-sm font-medium border shadow-sm">Rent to read full book</span>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPreviewBook(null)}>Close</Button>
+              <Button onClick={() => {
+                if (previewBook) handleAddToCart(previewBook);
+                setPreviewBook(null);
+              }}>Add to Cart</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
