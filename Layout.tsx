@@ -20,8 +20,11 @@ import {
   Map,
   Settings as SettingsIcon,
   Download,
-  User
+  User,
+  BookOpen,
+  Bell
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRole } from "@/lib/RoleContext";
 
 const INTERNAL_ROLES = ['Super Admin', 'Admin', 'Compliance Manager', 'Employee', 'Sales'];
@@ -158,6 +161,13 @@ export const Layout = ({ children }: { children: ReactNode }) => {
           </SidebarGroup>
 
           <SidebarGroup title="NETWORK" allowedRoles={[...INTERNAL_ROLES, 'Client', 'Qualifier']}>
+            <SidebarItem 
+              icon={<BookOpen className="w-4 h-4" />} 
+              label="Library" 
+              href="/library" 
+              isActive={location.pathname === "/library"}
+              allowedRoles={[...INTERNAL_ROLES, 'Client', 'Qualifier', 'Vendor']}
+            />
             <SidebarItem 
               icon={<ClipboardList className="w-4 h-4" />} 
               label="Onboarding" 
@@ -326,8 +336,60 @@ export const Layout = ({ children }: { children: ReactNode }) => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 overflow-x-hidden">
-        {children}
+      <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+        {/* Top Nav Bar */}
+        <header className="h-16 border-b bg-white flex items-center justify-between px-6 shrink-0">
+          <div className="font-medium text-lg text-slate-800">
+            {location.pathname === '/' ? 'Dashboard' : location.pathname.slice(1).charAt(0).toUpperCase() + location.pathname.slice(2)}
+          </div>
+          <div className="flex items-center gap-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+                  <Bell className="w-5 h-5" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <div className="flex items-center justify-between px-4 py-3 border-b">
+                  <span className="font-semibold">Notifications</span>
+                  <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-full">1 New</span>
+                </div>
+                <div className="max-h-[300px] overflow-y-auto">
+                  <div className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 mt-1.5 bg-primary rounded-full shrink-0"></div>
+                      <div>
+                        <p className="text-sm font-medium">License Approved</p>
+                        <p className="text-xs text-slate-500 mt-0.5">Your electrical license for TX has been approved.</p>
+                        <p className="text-xs text-slate-400 mt-1">2 hours ago</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-4 py-3 hover:bg-slate-50 cursor-pointer">
+                    <div className="flex items-start gap-3 opacity-60">
+                      <div className="w-2 h-2 mt-1.5 bg-transparent rounded-full shrink-0"></div>
+                      <div>
+                        <p className="text-sm font-medium">New Work Order</p>
+                        <p className="text-xs text-slate-500 mt-0.5">A new placement work order was assigned to you.</p>
+                        <p className="text-xs text-slate-400 mt-1">1 day ago</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-4 py-2 border-t text-center">
+                  <button className="text-sm text-primary hover:underline">Mark all as read</button>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+              {role.charAt(0)}
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 overflow-y-auto">
+          {children}
+        </div>
       </main>
     </div>
   );

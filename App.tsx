@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import Export from "./pages/Export";
 import Profile from "./pages/Profile";
+import Library from "./pages/Library";
 import { RoleProvider } from "./lib/RoleContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
             <Route path="/retention" element={<ProtectedRoute><Retention /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
             <Route path="/export" element={<Export />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
