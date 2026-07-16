@@ -12,7 +12,6 @@ import Retention from "./pages/Retention";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import { RoleProvider } from "./lib/RoleContext";
-import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -25,12 +24,12 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
-            <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-            <Route path="/retention" element={<ProtectedRoute><Retention /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/" element={<Index />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/roles" element={<Roles />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/retention" element={<Retention />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
